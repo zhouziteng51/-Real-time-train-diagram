@@ -1,0 +1,50 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ["./index.html", "./src/**/*.{ts,tsx}"],
+  theme: {
+    extend: {
+      colors: {
+        "primary": "#b7000c",
+        "primary-container": "#e60012",
+        "on-primary": "#ffffff",
+        "on-primary-container": "#fff7f6",
+        "surface": "#fff8f7",
+        "surface-container": "#ffe9e6",
+        "surface-container-low": "#fff0ee",
+        "surface-container-lowest": "#ffffff",
+        "surface-variant": "#ffdad5",
+        "on-surface": "#2a1614",
+        "on-surface-variant": "#5f3f3b",
+        "outline": "#946e69",
+        "outline-variant": "#e9bcb6",
+        "secondary": "#175ead",
+        "on-secondary": "#ffffff",
+        "secondary-container": "#72aafe",
+        "tertiary": "#0058b2",
+        "error": "#ba1a1a",
+        "on-error": "#ffffff",
+        "error-container": "#ffdad6",
+        "on-error-container": "#93000a",
+      },
+      fontFamily: {
+        sans: ["Inter", "ui-sans-serif", "system-ui"],
+        mono: ["JetBrains Mono", "ui-monospace"],
+      },
+      spacing: {
+        "xs": "4px",
+        "sm": "8px",
+        "md": "16px",
+        "lg": "24px",
+        "xl": "32px",
+        "touch-target": "48px",
+        "margin-mobile": "16px",
+      },
+      borderRadius: {
+        "DEFAULT": "0.25rem",
+        "lg": "0.5rem",
+        "xl": "0.75rem",
+      },
+    },
+  },
+  plugins: [],
+};

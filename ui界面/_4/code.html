@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Master Schedule - Metro Ops Control</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-tint": "#c0000d",
+                        "secondary-fixed-dim": "#a8c8ff",
+                        "surface-container-high": "#ffe2de",
+                        "on-surface": "#2a1614",
+                        "on-primary-fixed": "#410001",
+                        "primary": "#b7000c",
+                        "tertiary-fixed-dim": "#abc7ff",
+                        "on-secondary": "#ffffff",
+                        "surface-variant": "#ffdad5",
+                        "secondary-fixed": "#d5e3ff",
+                        "tertiary": "#0058b2",
+                        "on-error-container": "#93000a",
+                        "on-surface-variant": "#5f3f3b",
+                        "error": "#ba1a1a",
+                        "on-primary": "#ffffff",
+                        "primary-container": "#e60012",
+                        "outline-variant": "#e9bcb6",
+                        "on-tertiary-fixed-variant": "#00458f",
+                        "tertiary-container": "#0070e0",
+                        "surface-dim": "#f6d2cd",
+                        "tertiary-fixed": "#d7e3ff",
+                        "on-primary-fixed-variant": "#930007",
+                        "surface-container-lowest": "#ffffff",
+                        "outline": "#946e69",
+                        "primary-fixed": "#ffdad5",
+                        "on-tertiary-fixed": "#001b3f",
+                        "on-error": "#ffffff",
+                        "on-primary-container": "#fff7f6",
+                        "surface-container-highest": "#ffdad5",
+                        "on-tertiary": "#ffffff",
+                        "primary-fixed-dim": "#ffb4aa",
+                        "secondary": "#175ead",
+                        "surface-container": "#ffe9e6",
+                        "inverse-surface": "#412b28",
+                        "on-secondary-container": "#003d79",
+                        "surface": "#fff8f7",
+                        "on-tertiary-container": "#f9f8ff",
+                        "background": "#fff8f7",
+                        "on-secondary-fixed": "#001b3c",
+                        "surface-container-low": "#fff0ee",
+                        "on-background": "#2a1614",
+                        "surface-bright": "#fff8f7",
+                        "error-container": "#ffdad6",
+                        "secondary-container": "#72aafe",
+                        "inverse-on-surface": "#ffedea",
+                        "on-secondary-fixed-variant": "#004689",
+                        "inverse-primary": "#ffb4aa"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "base": "4px",
+                        "touch-target": "48px",
+                        "sm": "8px",
+                        "margin-mobile": "16px",
+                        "lg": "24px",
+                        "xl": "32px",
+                        "gutter-mobile": "12px",
+                        "xs": "4px",
+                        "md": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-md": ["Inter"],
+                        "display-sm": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "title-lg": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "data-mono": ["JetBrains Mono"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "display-sm": ["30px", { "lineHeight": "38px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "title-lg": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "headline-lg": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "data-mono": ["14px", { "lineHeight": "20px", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen pb-[80px] md:pb-0 pt-[64px] font-body-md antialiased">
+<!-- TopAppBar -->
+<header class="fixed top-0 full-width bg-surface dark:bg-on-background border-b border-outline-variant dark:border-outline shadow-sm flex items-center justify-between px-margin-mobile h-touch-target w-full z-50">
+<div class="flex items-center gap-md">
+<button aria-label="Search" class="flex items-center justify-center w-touch-target h-touch-target text-on-surface-variant hover:bg-surface-container-high transition-colors active:scale-95 duration-100 rounded-full">
+<span class="material-symbols-outlined">search</span>
+</button>
+<h1 class="font-headline-lg text-headline-lg text-primary dark:text-primary-fixed-dim tracking-tight">Metro Ops Control</h1>
+</div>
+<!-- Desktop Navigation Cluster (Responsive Pivot) -->
+<nav class="hidden md:flex items-center h-full gap-lg">
+<a class="h-full flex items-center px-sm text-on-surface-variant hover:bg-surface-container-high transition-colors font-label-md text-label-md" href="#">Attached</a>
+<a class="h-full flex items-center px-sm text-on-surface-variant hover:bg-surface-container-high transition-colors font-label-md text-label-md" href="#">Home</a>
+<a class="h-full flex items-center px-sm text-primary font-bold border-b-2 border-primary hover:bg-surface-container-high transition-colors font-label-md text-label-md" href="#">Schedule</a>
+</nav>
+<button aria-label="Account" class="flex items-center justify-center w-touch-target h-touch-target text-on-surface-variant hover:bg-surface-container-high transition-colors active:scale-95 duration-100 rounded-full">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</header>
+<!-- Main Content Canvas -->
+<main class="w-full max-w-5xl mx-auto p-margin-mobile md:p-lg flex flex-col gap-lg">
+<!-- Page Context -->
+<div class="flex flex-col gap-xs mb-sm">
+<h2 class="font-display-sm text-display-sm text-on-surface">主时刻表 (Master Schedule)</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">管理与查看全线标准运行交路</p>
+</div>
+<!-- Section 1: Master Schedule Import -->
+<section class="bg-surface rounded-xl border border-outline-variant shadow-sm flex flex-col overflow-hidden">
+<div class="px-md py-sm border-b border-outline-variant bg-surface-container-low flex items-center gap-sm">
+<span class="material-symbols-outlined text-secondary">upload_file</span>
+<h3 class="font-title-lg text-title-lg text-on-surface">主时刻表导入</h3>
+</div>
+<div class="p-md">
+<!-- Dropzone Area -->
+<div class="border-2 border-dashed border-outline-variant rounded-lg bg-surface-container-lowest hover:bg-surface-container-low transition-colors min-h-[160px] flex flex-col items-center justify-center gap-md cursor-pointer relative group">
+<div class="flex gap-md text-outline group-hover:text-primary transition-colors">
+<span class="material-symbols-outlined" style="font-size: 32px; font-variation-settings: 'FILL' 1;">description</span>
+<span class="material-symbols-outlined" style="font-size: 32px; font-variation-settings: 'FILL' 1;">picture_as_pdf</span>
+<span class="material-symbols-outlined" style="font-size: 32px; font-variation-settings: 'FILL' 1;">table</span>
+</div>
+<div class="text-center">
+<p class="font-headline-md text-headline-md text-on-surface mb-xs">拖拽文件至此 或 点击上传</p>
+<p class="font-body-md text-body-md text-on-surface-variant">支持 Word (.docx), PDF (.pdf), Excel (.xlsx) 格式</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Actions: Quick Links -->
+<section class="grid grid-cols-2 gap-md">
+<button class="bg-surface-container-high text-on-surface hover:bg-surface-variant transition-colors h-touch-target rounded-lg flex items-center justify-center gap-sm font-label-md text-label-md shadow-sm border border-outline-variant active:scale-95 duration-100">
+<span class="material-symbols-outlined">history</span>
+                历史记录
+            </button>
+<button class="bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container transition-colors h-touch-target rounded-lg flex items-center justify-center gap-sm font-label-md text-label-md shadow-sm active:scale-95 duration-100">
+<span class="material-symbols-outlined">edit_calendar</span>
+                时刻表变更
+            </button>
+</section>
+<!-- Section 2: Standard Schedule Display (图-交路) -->
+<section class="bg-surface rounded-xl border border-outline-variant shadow-sm flex flex-col overflow-hidden">
+<div class="px-md py-sm border-b border-outline-variant bg-surface-container-low flex items-center justify-between">
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-secondary">route</span>
+<h3 class="font-title-lg text-title-lg text-on-surface">标准时刻表 (图-交路)</h3>
+</div>
+<button class="text-primary font-label-md text-label-md flex items-center gap-xs hover:bg-surface-container-high p-xs rounded-DEFAULT">
+<span class="material-symbols-outlined" style="font-size: 18px;">filter_list</span>
+                    筛选
+                </button>
+</div>
+<div class="flex flex-col">
+<!-- Dispatch Card 1 -->
+<div class="flex flex-col p-md border-b border-outline-variant hover:bg-surface-container-lowest transition-colors relative">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-secondary"></div>
+<div class="flex justify-between items-start mb-sm pl-sm">
+<div class="flex items-center gap-sm">
+<span class="font-data-mono text-data-mono text-on-surface font-bold">R-1042</span>
+<div class="bg-secondary/10 text-secondary px-2 py-1 rounded-full font-label-md text-[10px]">运行中 (Active)</div>
+</div>
+<span class="font-label-md text-label-md text-on-surface-variant">08:15 - 16:30</span>
+</div>
+<div class="pl-sm flex items-center gap-sm text-on-surface-variant">
+<span class="material-symbols-outlined" style="font-size: 16px;">subway</span>
+<span class="font-body-md text-body-md">North Terminal <span class="mx-xs material-symbols-outlined" style="font-size: 14px;">arrow_forward</span> Central Hub</span>
+</div>
+</div>
+<!-- Dispatch Card 2 -->
+<div class="flex flex-col p-md border-b border-outline-variant hover:bg-surface-container-lowest transition-colors relative bg-surface-container-low">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary"></div>
+<div class="flex justify-between items-start mb-sm pl-sm">
+<div class="flex items-center gap-sm">
+<span class="font-data-mono text-data-mono text-on-surface font-bold">R-1045</span>
+<div class="bg-primary/10 text-primary px-2 py-1 rounded-full font-label-md text-[10px]">延迟 (Delayed)</div>
+</div>
+<span class="font-label-md text-label-md text-error font-bold">08:45 - 17:00</span>
+</div>
+<div class="pl-sm flex items-center gap-sm text-on-surface-variant">
+<span class="material-symbols-outlined" style="font-size: 16px;">subway</span>
+<span class="font-body-md text-body-md">South Yard <span class="mx-xs material-symbols-outlined" style="font-size: 14px;">arrow_forward</span> East Station</span>
+</div>
+</div>
+<!-- Dispatch Card 3 -->
+<div class="flex flex-col p-md hover:bg-surface-container-lowest transition-colors relative">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-outline"></div>
+<div class="flex justify-between items-start mb-sm pl-sm">
+<div class="flex items-center gap-sm">
+<span class="font-data-mono text-data-mono text-on-surface font-bold">R-1050</span>
+<div class="bg-surface-variant text-on-surface-variant px-2 py-1 rounded-full font-label-md text-[10px]">待命 (Standby)</div>
+</div>
+<span class="font-label-md text-label-md text-on-surface-variant">10:00 - 18:15</span>
+</div>
+<div class="pl-sm flex items-center gap-sm text-on-surface-variant">
+<span class="material-symbols-outlined" style="font-size: 16px;">subway</span>
+<span class="font-body-md text-body-md">Depot A <span class="mx-xs material-symbols-outlined" style="font-size: 14px;">arrow_forward</span> Line 2 Loop</span>
+</div>
+</div>
+</div>
+<div class="p-sm bg-surface-container-lowest text-center border-t border-outline-variant">
+<button class="font-label-md text-label-md text-secondary hover:text-secondary-container transition-colors py-xs px-sm rounded-DEFAULT hover:bg-surface-container-low">查看完整交路表</button>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center h-16 bg-surface px-sm border-t border-outline-variant dark:border-outline shadow-md z-50">
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-low active:scale-90 transition-transform w-touch-target h-touch-target rounded-full" href="#">
+<span class="material-symbols-outlined">map</span>
+<span class="font-label-md text-[10px] mt-xs">Attached</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-low active:scale-90 transition-transform w-touch-target h-touch-target rounded-full" href="#">
+<span class="material-symbols-outlined">train</span>
+<span class="font-label-md text-[10px] mt-xs">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-4 py-1 active:scale-90 transition-transform min-w-[64px] h-[40px]" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">calendar_month</span>
+<span class="font-label-md text-[10px] mt-xs">Schedule</span>
+</a>
+</nav>
+</body></html>

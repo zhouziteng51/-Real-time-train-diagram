@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Metro Ops Control - Route Map</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config from Style Guidance -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-tint": "#c0000d",
+                    "secondary-fixed-dim": "#a8c8ff",
+                    "surface-container-high": "#ffe2de",
+                    "on-surface": "#2a1614",
+                    "on-primary-fixed": "#410001",
+                    "primary": "#b7000c",
+                    "tertiary-fixed-dim": "#abc7ff",
+                    "on-secondary": "#ffffff",
+                    "surface-variant": "#ffdad5",
+                    "secondary-fixed": "#d5e3ff",
+                    "tertiary": "#0058b2",
+                    "on-error-container": "#93000a",
+                    "on-surface-variant": "#5f3f3b",
+                    "error": "#ba1a1a",
+                    "on-primary": "#ffffff",
+                    "primary-container": "#e60012",
+                    "outline-variant": "#e9bcb6",
+                    "on-tertiary-fixed-variant": "#00458f",
+                    "tertiary-container": "#0070e0",
+                    "surface-dim": "#f6d2cd",
+                    "tertiary-fixed": "#d7e3ff",
+                    "on-primary-fixed-variant": "#930007",
+                    "surface-container-lowest": "#ffffff",
+                    "outline": "#946e69",
+                    "primary-fixed": "#ffdad5",
+                    "on-tertiary-fixed": "#001b3f",
+                    "on-error": "#ffffff",
+                    "on-primary-container": "#fff7f6",
+                    "surface-container-highest": "#ffdad5",
+                    "on-tertiary": "#ffffff",
+                    "primary-fixed-dim": "#ffb4aa",
+                    "secondary": "#175ead",
+                    "surface-container": "#ffe9e6",
+                    "inverse-surface": "#412b28",
+                    "on-secondary-container": "#003d79",
+                    "surface": "#fff8f7",
+                    "on-tertiary-container": "#f9f8ff",
+                    "background": "#fff8f7",
+                    "on-secondary-fixed": "#001b3c",
+                    "surface-container-low": "#fff0ee",
+                    "on-background": "#2a1614",
+                    "surface-bright": "#fff8f7",
+                    "error-container": "#ffdad6",
+                    "secondary-container": "#72aafe",
+                    "inverse-on-surface": "#ffedea",
+                    "on-secondary-fixed-variant": "#004689",
+                    "inverse-primary": "#ffb4aa"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "base": "4px",
+                    "touch-target": "48px",
+                    "sm": "8px",
+                    "margin-mobile": "16px",
+                    "lg": "24px",
+                    "xl": "32px",
+                    "gutter-mobile": "12px",
+                    "xs": "4px",
+                    "md": "16px"
+            },
+            "fontFamily": {
+                    "headline-md": ["Inter"],
+                    "label-md": ["Inter"],
+                    "body-md": ["Inter"],
+                    "display-sm": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "title-lg": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "data-mono": ["JetBrains Mono"]
+            },
+            "fontSize": {
+                    "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                    "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                    "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                    "display-sm": ["30px", { "lineHeight": "38px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                    "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                    "title-lg": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                    "headline-lg": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                    "data-mono": ["14px", { "lineHeight": "20px", "fontWeight": "500" }]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        /* Utility for Material Symbols to handle filled states */
+        .material-symbols-outlined[data-weight="fill"] {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-md antialiased overflow-hidden">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 flex items-center justify-between px-margin-mobile h-touch-target bg-surface border-b border-outline-variant shadow-sm transition-colors">
+<button aria-label="Search" class="flex items-center justify-center w-touch-target h-touch-target text-on-surface-variant hover:bg-surface-container-high transition-colors active:scale-95 duration-100 rounded-full">
+<span class="material-symbols-outlined">search</span>
+</button>
+<h1 class="font-headline-md text-headline-md text-primary font-bold tracking-tight">Metro Ops Control</h1>
+<button aria-label="Account" class="flex items-center justify-center w-touch-target h-touch-target text-on-surface-variant hover:bg-surface-container-high transition-colors active:scale-95 duration-100 rounded-full">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</header>
+<!-- Main Application Layout -->
+<main class="pt-touch-target h-screen flex flex-col md:flex-row w-full">
+<!-- Left Navigation Panel -->
+<aside class="w-full md:w-80 h-[calc(100vh-48px-64px)] md:h-[calc(100vh-48px)] bg-surface-container-lowest border-r border-outline-variant flex flex-col flex-shrink-0 z-10">
+<!-- Context Header -->
+<div class="px-md py-sm border-b border-outline-variant bg-surface-container-low flex items-center justify-between">
+<h2 class="font-title-lg text-title-lg text-on-surface">列车时刻表</h2>
+<span class="material-symbols-outlined text-on-surface-variant text-sm">filter_list</span>
+</div>
+<!-- Scrollable Train ID List -->
+<div class="flex-1 overflow-y-auto">
+<nav class="flex flex-col">
+<!-- Active Item -->
+<button class="w-full flex items-center justify-between p-md border-b border-outline-variant bg-primary-container text-on-primary-container border-l-4 border-l-primary active:scale-[0.98] transition-transform text-left">
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined" data-weight="fill">train</span>
+<span class="font-data-mono text-data-mono font-bold tracking-wider">G6001</span>
+</div>
+<div class="flex items-center gap-xs">
+<span class="px-2 py-0.5 rounded-sm bg-surface-container-lowest text-primary font-label-md text-label-md">准点</span>
+<span class="material-symbols-outlined">chevron_right</span>
+</div>
+</button>
+<!-- Inactive Items -->
+<button class="w-full flex items-center justify-between p-md border-b border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-container-low active:scale-[0.98] transition-all text-left">
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-on-surface-variant">train</span>
+<span class="font-data-mono text-data-mono tracking-wider">G6002</span>
+</div>
+<span class="material-symbols-outlined text-outline">chevron_right</span>
+</button>
+<button class="w-full flex items-center justify-between p-md border-b border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-container-low active:scale-[0.98] transition-all text-left">
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-on-surface-variant">train</span>
+<span class="font-data-mono text-data-mono tracking-wider">G6003</span>
+</div>
+<div class="flex items-center gap-xs">
+<span class="px-2 py-0.5 rounded-sm bg-error-container text-on-error-container font-label-md text-label-md">延误</span>
+<span class="material-symbols-outlined text-outline">chevron_right</span>
+</div>
+</button>
+<button class="w-full flex items-center justify-between p-md border-b border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-container-low active:scale-[0.98] transition-all text-left">
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-on-surface-variant">train</span>
+<span class="font-data-mono text-data-mono tracking-wider">G6004</span>
+</div>
+<span class="material-symbols-outlined text-outline">chevron_right</span>
+</button>
+<button class="w-full flex items-center justify-between p-md border-b border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-container-low active:scale-[0.98] transition-all text-left">
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-on-surface-variant">train</span>
+<span class="font-data-mono text-data-mono tracking-wider">G6005</span>
+</div>
+<span class="material-symbols-outlined text-outline">chevron_right</span>
+</button>
+</nav>
+</div>
+<!-- Bottom Area: Import File Card -->
+<div class="p-md bg-surface border-t border-outline-variant shrink-0">
+<button class="w-full flex flex-col items-center justify-center p-md border-2 border-dashed border-outline-variant rounded-lg bg-surface-container-lowest hover:bg-surface-container-low hover:border-primary transition-colors group h-[120px]">
+<div class="w-10 h-10 rounded-full bg-secondary-fixed flex items-center justify-center mb-sm group-hover:bg-primary-container transition-colors">
+<span class="material-symbols-outlined text-on-secondary-fixed group-hover:text-on-primary-container">upload_file</span>
+</div>
+<span class="font-title-lg text-title-lg text-on-surface mb-xs group-hover:text-primary transition-colors">导入文件</span>
+<span class="font-label-md text-label-md text-on-surface-variant uppercase">支持 Word, PDF, xlsx 格式</span>
+</button>
+</div>
+</aside>
+<!-- Main Content Area (Running Graph/Map Canvas) - Hidden on mobile, visible on tablet/desktop -->
+<section class="hidden md:flex flex-1 bg-surface-container-low relative items-center justify-center overflow-hidden">
+<!-- Simulated Map Canvas -->
+<div class="absolute inset-0 bg-white">
+<img alt="Tactical Map Canvas" class="w-full h-full object-cover opacity-80 mix-blend-luminosity" data-alt="A highly detailed, industrial-grade railway running graph and tactical routing map displayed on a modern command center interface. The visual style is light-mode Corporate Modern, utilizing a stark white background with precise, color-coded grid lines in Metro Red and subtle cool grays indicating train paths and station nodes. The aesthetic is authoritative and utilitarian, prioritizing function and immediate legibility over decoration, suitable for a high-stakes metro operations control room." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCc7RqNm-cQpCG-vwJlm_5sgQ2pborLZUKJO31vddXg_RvAMVG0f2DcEzwENzX_GuFeAQ33e6cwqcrGAU-z-kVwqLmZx3UWuEybZ4lefwlPZBUDqsdYxxLjVztxlEBxTZN1sT4f1v0_9tt6UWu1usZMxClFhBoXsK6MjzCTzN4KeZuIIfzeyTnmRkf9NlK36TMbbXPsq1mScpYNbtEHcn5S2TnTOkDyfcgUpRBSmpfE86PkjM9M6p99esjDyqIy-CmYLI16aS5Udlg"/>
+<!-- Overlay Gradients for Depth -->
+<div class="absolute inset-0 bg-gradient-to-r from-surface-container-lowest via-transparent to-transparent opacity-90"></div>
+<!-- Floating Info Card on Canvas -->
+<div class="absolute top-lg left-lg bg-surface-container-lowest border border-outline-variant rounded-lg shadow-sm p-md w-64">
+<div class="flex items-center gap-sm mb-sm border-b border-outline-variant pb-sm">
+<span class="w-3 h-3 rounded-full bg-primary animate-pulse"></span>
+<h3 class="font-title-lg text-title-lg text-on-surface">实时监控: G6001</h3>
+</div>
+<div class="space-y-sm">
+<div class="flex justify-between">
+<span class="font-body-md text-body-md text-on-surface-variant">当前区间</span>
+<span class="font-data-mono text-data-mono text-on-surface">STA_A - STA_B</span>
+</div>
+<div class="flex justify-between">
+<span class="font-body-md text-body-md text-on-surface-variant">速度</span>
+<span class="font-data-mono text-data-mono text-on-surface">240 km/h</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center h-16 bg-surface px-sm border-t border-outline-variant shadow-md z-50 transition-transform">
+<!-- Attached (Active) -->
+<button aria-label="Attached" class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-4 py-1 active:scale-90 transition-transform hover:bg-surface-container-low min-w-[64px]">
+<span class="material-symbols-outlined" data-weight="fill">map</span>
+<span class="font-label-md text-label-md mt-xs">Attached</span>
+</button>
+<!-- Home (Inactive) -->
+<button aria-label="Home" class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-low active:scale-90 transition-transform rounded-xl px-4 py-1 min-w-[64px]">
+<span class="material-symbols-outlined">train</span>
+<span class="font-label-md text-label-md mt-xs">Home</span>
+</button>
+<!-- Schedule (Inactive) -->
+<button aria-label="Schedule" class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-low active:scale-90 transition-transform rounded-xl px-4 py-1 min-w-[64px]">
+<span class="material-symbols-outlined">calendar_month</span>
+<span class="font-label-md text-label-md mt-xs">Schedule</span>
+</button>
+</nav>
+</body></html>

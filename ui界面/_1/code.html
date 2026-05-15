@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Metro Ops Control - Global Overview</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-tint": "#c0000d",
+                        "secondary-fixed-dim": "#a8c8ff",
+                        "surface-container-high": "#ffe2de",
+                        "on-surface": "#2a1614",
+                        "on-primary-fixed": "#410001",
+                        "primary": "#b7000c",
+                        "tertiary-fixed-dim": "#abc7ff",
+                        "on-secondary": "#ffffff",
+                        "surface-variant": "#ffdad5",
+                        "secondary-fixed": "#d5e3ff",
+                        "tertiary": "#0058b2",
+                        "on-error-container": "#93000a",
+                        "on-surface-variant": "#5f3f3b",
+                        "error": "#ba1a1a",
+                        "on-primary": "#ffffff",
+                        "primary-container": "#e60012",
+                        "outline-variant": "#e9bcb6",
+                        "on-tertiary-fixed-variant": "#00458f",
+                        "tertiary-container": "#0070e0",
+                        "surface-dim": "#f6d2cd",
+                        "tertiary-fixed": "#d7e3ff",
+                        "on-primary-fixed-variant": "#930007",
+                        "surface-container-lowest": "#ffffff",
+                        "outline": "#946e69",
+                        "primary-fixed": "#ffdad5",
+                        "on-tertiary-fixed": "#001b3f",
+                        "on-error": "#ffffff",
+                        "on-primary-container": "#fff7f6",
+                        "surface-container-highest": "#ffdad5",
+                        "on-tertiary": "#ffffff",
+                        "primary-fixed-dim": "#ffb4aa",
+                        "secondary": "#175ead",
+                        "surface-container": "#ffe9e6",
+                        "inverse-surface": "#412b28",
+                        "on-secondary-container": "#003d79",
+                        "surface": "#fff8f7",
+                        "on-tertiary-container": "#f9f8ff",
+                        "background": "#fff8f7",
+                        "on-secondary-fixed": "#001b3c",
+                        "surface-container-low": "#fff0ee",
+                        "on-background": "#2a1614",
+                        "surface-bright": "#fff8f7",
+                        "error-container": "#ffdad6",
+                        "secondary-container": "#72aafe",
+                        "inverse-on-surface": "#ffedea",
+                        "on-secondary-fixed-variant": "#004689",
+                        "inverse-primary": "#ffb4aa"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "base": "4px",
+                        "touch-target": "48px",
+                        "sm": "8px",
+                        "margin-mobile": "16px",
+                        "lg": "24px",
+                        "xl": "32px",
+                        "gutter-mobile": "12px",
+                        "xs": "4px",
+                        "md": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-md": ["Inter"],
+                        "display-sm": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "title-lg": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "data-mono": ["JetBrains Mono"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "display-sm": ["30px", { "lineHeight": "38px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "title-lg": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "headline-lg": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "data-mono": ["14px", { "lineHeight": "20px", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-[#F8FAFC] text-on-surface font-body-md min-h-screen pb-20">
+<!-- TopAppBar -->
+<header class="bg-surface text-primary font-headline-md text-headline-md full-width top-0 shadow-sm flex items-center justify-between px-margin-mobile h-touch-target w-full z-50 sticky">
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary cursor-pointer hover:bg-surface-container-high transition-colors active:scale-95 duration-100 rounded-full p-1" style="font-variation-settings: 'FILL' 0;">search</span>
+</div>
+<div class="font-headline-lg text-headline-lg text-primary font-bold tracking-tight">
+            Metro Ops Control
+        </div>
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary cursor-pointer hover:bg-surface-container-high transition-colors active:scale-95 duration-100 rounded-full p-1" style="font-variation-settings: 'FILL' 0;">account_circle</span>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="p-margin-mobile md:p-lg max-w-7xl mx-auto space-y-md">
+<!-- Search Bar Section (Contextual) -->
+<section class="w-full">
+<div class="relative w-full max-w-md mx-auto">
+<span class="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant z-10 pointer-events-none">search</span>
+<input class="w-full h-touch-target pl-[40px] pr-sm border border-[#CBD5E1] rounded focus:border-[#0055A4] focus:ring-1 focus:ring-[#0055A4] bg-surface-container-lowest text-on-surface font-body-lg placeholder-on-surface-variant transition-colors" placeholder="搜索人员/车次" type="text"/>
+</div>
+</section>
+<!-- Status Bar -->
+<section class="bg-surface-container-lowest rounded shadow-sm border border-[#E2E8F0] p-sm grid grid-cols-3 gap-xs text-center items-center divide-x divide-[#E2E8F0]">
+<div class="flex flex-col items-center justify-center py-xs">
+<span class="material-symbols-outlined text-on-surface-variant mb-xs text-[20px]">badge</span>
+<span class="font-data-mono text-data-mono text-on-surface">张三 (001)</span>
+</div>
+<div class="flex flex-col items-center justify-center py-xs px-sm">
+<div class="bg-[rgba(183,0,12,0.1)] text-primary font-bold px-2 py-0.5 rounded text-[12px] mb-xs uppercase">Active Route</div>
+<span class="font-data-mono text-data-mono text-on-surface font-bold">上行 - G6001</span>
+</div>
+<div class="flex flex-col items-center justify-center py-xs">
+<span class="material-symbols-outlined text-on-surface-variant mb-xs text-[20px]">location_on</span>
+<span class="font-title-lg text-title-lg text-on-surface">南京南站</span>
+</div>
+</section>
+<!-- Bento Grid Main Content -->
+<section class="grid grid-cols-1 md:grid-cols-12 gap-md pt-sm">
+<!-- Large Central Card: Network Diagram / Dashboard -->
+<div class="md:col-span-12 bg-surface-container-lowest rounded-lg shadow-sm border border-[#E2E8F0] overflow-hidden flex flex-col h-[500px]">
+<div class="p-md border-b border-[#E2E8F0] flex justify-between items-center bg-surface-bright">
+<h2 class="font-title-lg text-title-lg text-on-surface flex items-center gap-xs">
+<span class="material-symbols-outlined text-primary">route</span>
+                        全局交路图
+                    </h2>
+<div class="flex gap-xs">
+<button class="px-sm py-xs bg-[#F8FAFC] border border-[#E2E8F0] rounded text-on-surface font-label-md hover:bg-surface-container-low transition-colors">Refresh</button>
+</div>
+</div>
+<div class="flex-1 relative w-full h-full bg-[#1A1C1E] flex items-center justify-center overflow-hidden group">
+<!-- Placeholder for Map/Diagram using a generated background image -->
+<div class="absolute inset-0 bg-cover bg-center opacity-80 mix-blend-screen" data-alt="A highly detailed, stylized digital metro network diagram displayed on a dark, high-contrast control room screen. The map features glowing, neon-like geometric lines intersecting at various nodes, representing train routes and stations. The overall aesthetic is utilitarian and authoritative, utilizing a palette of deep blacks, crisp whites, and stark, vibrant red accents to denote active trains. The lighting is harsh and synthetic, typical of an enterprise operations dashboard." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAao2aoS5U6LvQxeEM50anUCsB2CG8h-AirsOeIZ0iCjJYnwNO8QgW9yr9g_Xjf_QFMyQTGIsaTLIT48ZGooyOQ4Kka4dTD51azm4Yu46nviMoLjW0NPcOhbnPMPjvmJiRnz79gfjDZQA5Ep9hd2JEb1Pd6M5ehiGu9CUsUuqgTArHNbEefECumf7uggM2oUoHrW1ukJgTFQsoZO6gtbwU18T_BSTEzWs7c0GRlSMk76xbVimS0RHefR_DbJZZpXPISqxYqibbVzoU');">
+</div>
+<!-- Overlay UI elements simulating live data on the map -->
+<div class="absolute z-10 flex flex-col gap-sm p-md top-0 left-0">
+<div class="bg-[rgba(255,255,255,0.9)] backdrop-blur-sm border-l-4 border-[#00A651] px-sm py-xs rounded-r shadow-md font-data-mono text-[12px] text-on-surface flex items-center gap-xs">
+<span class="w-2 h-2 rounded-full bg-[#00A651] animate-pulse"></span>
+                             G6001 - ON TIME
+                         </div>
+<div class="bg-[rgba(255,255,255,0.9)] backdrop-blur-sm border-l-4 border-primary px-sm py-xs rounded-r shadow-md font-data-mono text-[12px] text-on-surface flex items-center gap-xs">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                             G820 - DELAYED (3m)
+                         </div>
+</div>
+</div>
+</div>
+<!-- Supporting Cards (Optional extra context to flesh out the layout) -->
+<div class="md:col-span-6 bg-surface-container-lowest rounded shadow-sm border border-[#E2E8F0] p-md flex flex-col justify-between">
+<h3 class="font-title-lg text-title-lg text-on-surface mb-sm flex items-center gap-xs">
+<span class="material-symbols-outlined text-on-surface-variant">warning</span>
+                     Active Alerts
+                 </h3>
+<div class="space-y-xs">
+<div class="bg-[rgba(186,26,26,0.05)] border-l-4 border-error p-xs rounded-r flex items-start gap-xs">
+<span class="material-symbols-outlined text-error text-[16px] mt-0.5">error</span>
+<div>
+<p class="font-label-md text-on-surface font-bold">Signal Fault - Sector 4</p>
+<p class="font-body-md text-on-surface-variant text-[12px]">Maintenance dispatched. Speed restricted to 30km/h.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="md:col-span-6 bg-surface-container-lowest rounded shadow-sm border border-[#E2E8F0] p-md flex flex-col justify-between">
+<h3 class="font-title-lg text-title-lg text-on-surface mb-sm flex items-center gap-xs">
+<span class="material-symbols-outlined text-on-surface-variant">schedule</span>
+                     Upcoming Tasks
+                 </h3>
+<ul class="divide-y divide-[#E2E8F0]">
+<li class="py-sm flex justify-between items-center group cursor-pointer hover:bg-[#F8FAFC]">
+<div>
+<p class="font-label-md text-on-surface font-bold">Crew Change - Train G771</p>
+<p class="font-data-mono text-on-surface-variant text-[12px]">14:30 @ 南京南站</p>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">chevron_right</span>
+</li>
+</ul>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="bg-surface text-primary font-label-md text-label-md font-headline-md text-headline-md text-primary fixed bottom-0 w-full z-50 shadow-md fixed bottom-0 left-0 w-full flex justify-around items-center h-16 bg-surface px-sm md:hidden">
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-low active:scale-90 transition-transform h-full w-full max-w-[80px] rounded-lg">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">map</span>
+<span class="truncate w-full text-center">Attached</span>
+</button>
+<button class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-4 py-1 hover:bg-surface-container-low active:scale-90 transition-transform h-[80%] max-w-[80px]">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">train</span>
+<span class="truncate w-full text-center">Home</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-low active:scale-90 transition-transform h-full w-full max-w-[80px] rounded-lg">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">calendar_month</span>
+<span class="truncate w-full text-center">Schedule</span>
+</button>
+</nav>
+<!-- Desktop Side Nav Spacer (Hidden on Mobile) to simulate structure if needed -->
+<div class="hidden md:flex fixed top-[48px] bottom-0 left-0 w-[80px] bg-surface border-r border-[#E2E8F0] flex-col items-center py-md gap-lg shadow-sm z-40">
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-low p-xs rounded-lg w-full">
+<span class="material-symbols-outlined mb-1 text-[24px]">map</span>
+<span class="font-label-md text-[10px]">Attached</span>
+</button>
+<button class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-lg p-xs w-full">
+<span class="material-symbols-outlined mb-1 text-[24px]" style="font-variation-settings: 'FILL' 1;">train</span>
+<span class="font-label-md text-[10px]">Home</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-low p-xs rounded-lg w-full">
+<span class="material-symbols-outlined mb-1 text-[24px]">calendar_month</span>
+<span class="font-label-md text-[10px]">Schedule</span>
+</button>
+</div>
+</body></html>

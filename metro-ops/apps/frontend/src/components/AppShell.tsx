@@ -1,0 +1,81 @@
+import { NavLink, Outlet } from "react-router-dom";
+import { useRealtimeStore } from "../store/index.js";
+import { connectionStatusLabel } from "../format/display.js";
+
+const NAV = [
+  { to: "/", label: "首页", icon: "train", end: true },
+  { to: "/running-graph", label: "运行图", icon: "route", end: false },
+  { to: "/attached-route", label: "交路", icon: "map", end: false },
+  { to: "/master-schedule", label: "时刻表", icon: "calendar_month", end: false },
+  { to: "/history-trips", label: "历史", icon: "history", end: false },
+  { to: "/imports", label: "导入", icon: "upload_file", end: false },
+];
+
+export function AppShell() {
+  const status = useRealtimeStore((s) => s.connectionStatus);
+
+  return (
+    <div className="min-h-screen flex flex-col md:pl-[80px]">
+      <header className="bg-surface text-primary h-touch-target sticky top-0 z-50 shadow-sm flex items-center justify-between px-margin-mobile border-b border-outline-variant">
+        <span className="material-symbols-outlined cursor-pointer">search</span>
+        <div className="font-bold tracking-tight text-[20px]">地铁运行控制台</div>
+        <div className="flex items-center gap-sm text-[12px]">
+          <span
+            className={`w-2 h-2 rounded-full ${
+              status === "ONLINE"
+                ? "bg-emerald-500 animate-pulse"
+                : status === "CONNECTING"
+                  ? "bg-amber-500 animate-pulse"
+                  : "bg-gray-400"
+            }`}
+          />
+          <span className="text-on-surface-variant">{connectionStatusLabel(status)}</span>
+        </div>
+      </header>
+
+      <aside className="hidden md:flex fixed top-[48px] bottom-0 left-0 w-[80px] bg-surface border-r border-outline-variant flex-col items-center py-md gap-sm z-40">
+        {NAV.map((n) => (
+          <NavLink
+            key={n.to}
+            to={n.to}
+            end={n.end}
+            className={({ isActive }) =>
+              `flex flex-col items-center justify-center p-xs rounded-lg w-[72px] ${
+                isActive
+                  ? "bg-primary-container text-on-primary-container"
+                  : "text-on-surface-variant hover:bg-surface-container-low"
+              }`
+            }
+          >
+            <span className="material-symbols-outlined text-[24px] mb-1">{n.icon}</span>
+            <span className="text-[10px] font-semibold">{n.label}</span>
+          </NavLink>
+        ))}
+      </aside>
+
+      <main className="flex-1 pb-20 md:pb-0">
+        <Outlet />
+      </main>
+
+      <nav className="md:hidden fixed bottom-0 left-0 w-full h-16 bg-surface border-t border-outline-variant shadow-md z-50 flex justify-around items-center px-sm">
+        {NAV.slice(0, 5).map((n) => (
+          <NavLink
+            key={n.to}
+            to={n.to}
+            end={n.end}
+            className={({ isActive }) =>
+              `flex flex-col items-center justify-center min-w-[56px] py-1 rounded-lg ${
+                isActive
+                  ? "bg-primary-container text-on-primary-container"
+                  : "text-on-surface-variant"
+              }`
+            }
+          >
+            <span className="material-symbols-outlined">{n.icon}</span>
+            <span className="text-[10px] font-semibold">{n.label}</span>
+          </NavLink>
+        ))}
+      </nav>
+    </div>
+  );
+}
