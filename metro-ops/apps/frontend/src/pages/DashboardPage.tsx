@@ -25,6 +25,7 @@ interface LiveTrainDuty {
   operatorName: string;
   trainNo: string;
   routeId?: string | undefined;
+  scheduleVersionId: string;
   scheduleVersionName?: string | undefined;
   direction?: Direction | undefined;
   location: string;
@@ -39,9 +40,12 @@ interface LiveTrainDuty {
 }
 
 interface ActiveOperatingSchedule {
-  scheduleVersionName: "G6001" | "Z6001";
+  scheduleVersionId: string;
+  scheduleVersionName?: string | undefined;
   label: string;
-  calendarType: "WEEKDAY" | "WEEKEND";
+  source: "IMPORTED" | "FALLBACK";
+  importedAt?: string | undefined;
+  sourceFileName?: string | undefined;
 }
 
 interface CurrentDutiesResponse {
@@ -93,7 +97,7 @@ export function DashboardPage() {
             <div>
               今日执行：
               {activeSchedule
-                ? `${activeSchedule.label}（${activeSchedule.scheduleVersionName}）`
+                ? formatActiveSchedule(activeSchedule)
                 : "--"}
             </div>
           </div>
@@ -149,7 +153,7 @@ export function DashboardPage() {
                     )}
                   </td>
                   <td className="p-sm text-on-surface-variant">
-                    {duty.scheduleVersionName ?? "已导入时刻表"}
+                    {formatScheduleSource(duty)}
                   </td>
                 </tr>
               ))}
@@ -259,4 +263,18 @@ function formatStationPair(duty: LiveTrainDuty): string {
   if (duty.nextStationName) return `下一站：${duty.nextStationName}`;
   if (duty.previousStationName) return `上一站：${duty.previousStationName}`;
   return "逐站时刻已接入";
+}
+
+function formatActiveSchedule(schedule: ActiveOperatingSchedule): string {
+  const source =
+    schedule.source === "IMPORTED"
+      ? (schedule.sourceFileName ?? "已确认入库")
+      : "无导入兜底";
+  return `${schedule.label}（${schedule.scheduleVersionId} · ${source}）`;
+}
+
+function formatScheduleSource(duty: LiveTrainDuty): string {
+  return duty.scheduleVersionName
+    ? `${duty.scheduleVersionName}（${duty.scheduleVersionId}）`
+    : duty.scheduleVersionId;
 }

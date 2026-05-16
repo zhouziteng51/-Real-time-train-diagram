@@ -72,6 +72,7 @@ export function ImportCenterPage() {
       qc.invalidateQueries({ queryKey: ["imports"] });
       if (activeJobId)
         qc.invalidateQueries({ queryKey: ["imports", activeJobId] });
+      qc.invalidateQueries({ queryKey: ["runtime", "duties"] });
       qc.invalidateQueries({ queryKey: ["trips", "active"] });
       qc.invalidateQueries({ queryKey: ["trips", "history"] });
     },

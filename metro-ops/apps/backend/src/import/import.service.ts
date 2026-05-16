@@ -8,7 +8,6 @@ import type {
   ConfirmImportBody,
   NormalizedImportDocument,
 } from "@metro-ops/shared";
-import { RuntimeScheduleService } from "../schedule/runtime-schedule.service.js";
 import { TripStore } from "../trip/trip.store.js";
 import { ImportStore } from "./import.store.js";
 
@@ -19,8 +18,6 @@ export class ImportDomainService {
   constructor(
     @Inject(ImportStore) private readonly store: ImportStore,
     @Inject(TripStore) private readonly trips: TripStore,
-    @Inject(RuntimeScheduleService)
-    private readonly runtimeSchedule: RuntimeScheduleService,
   ) {}
 
   async confirmAndImport(
@@ -56,9 +53,6 @@ export class ImportDomainService {
       doc,
       body.acceptedSections,
     );
-    if (body.acceptedSections.trains) {
-      this.runtimeSchedule.upsertImportedDocument(doc);
-    }
     this.logger.log(
       `imported schedule ${result.scheduleVersionId}: ${result.trains} trains, ${result.segments} segments, ${result.duties} duties, ${result.projectedTrips} trips`,
     );

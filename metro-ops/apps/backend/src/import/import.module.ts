@@ -15,7 +15,6 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import type { ImportJob, NormalizedImportDocument } from "@metro-ops/shared";
 import { ConfirmImportBodySchema } from "@metro-ops/shared";
 import { RealtimeModule } from "../realtime/realtime.module.js";
-import { RuntimeScheduleModule } from "../schedule/runtime-schedule.module.js";
 import { TripModule } from "../trip/trip.module.js";
 import { ImportStore } from "./import.store.js";
 import { ParserFactory, detectSourceType } from "./parsers/parser.factory.js";
@@ -111,7 +110,7 @@ function normalizeUploadedFileName(fileName: string): string {
 }
 
 @Module({
-  imports: [RealtimeModule, TripModule, RuntimeScheduleModule],
+  imports: [RealtimeModule, TripModule],
   controllers: [ImportController],
   providers: [
     ImportStore,

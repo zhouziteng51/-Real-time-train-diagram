@@ -1,5 +1,5 @@
 import { Controller, Get, Inject, Module } from "@nestjs/common";
-import { PdfOcrHybridParser } from "../import/parsers/normalize.js";
+import { TripModule } from "../trip/trip.module.js";
 import {
   type ActiveOperatingSchedule,
   RuntimeScheduleService,
@@ -43,8 +43,9 @@ export class RuntimeScheduleController {
 }
 
 @Module({
+  imports: [TripModule],
   controllers: [RuntimeScheduleController],
-  providers: [RuntimeScheduleService, PdfOcrHybridParser],
+  providers: [RuntimeScheduleService],
   exports: [RuntimeScheduleService],
 })
 export class RuntimeScheduleModule {}

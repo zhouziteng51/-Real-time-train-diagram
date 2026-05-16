@@ -1,17 +1,18 @@
-import { Inject, Injectable, Logger, OnModuleInit } from "@nestjs/common";
-import { readFile } from "node:fs/promises";
+import { Inject, Injectable } from "@nestjs/common";
 import type { Direction, NormalizedImportDocument } from "@metro-ops/shared";
 import { DEMO_OPERATORS } from "../operator/operator.fixtures.js";
-import { PdfOcrHybridParser } from "../import/parsers/normalize.js";
+import { TripStore } from "../trip/trip.store.js";
 
 type TrainDoc = NormalizedImportDocument["trains"][number];
 type StationDoc = TrainDoc["stations"][number];
+type DutyDoc = NormalizedImportDocument["dutyAssignments"][number];
 
 export interface LiveTrainDuty {
   operatorId: string;
   operatorName: string;
   trainNo: string;
   routeId?: string | undefined;
+  scheduleVersionId: string;
   scheduleVersionName?: string | undefined;
   direction?: Direction | undefined;
   location: string;
@@ -25,54 +26,128 @@ export interface LiveTrainDuty {
   calculatedAt: string;
 }
 
-export type OperatingScheduleId = "G6001" | "Z6001";
-
 export interface ActiveOperatingSchedule {
-  scheduleVersionName: OperatingScheduleId;
+  scheduleVersionId: string;
+  scheduleVersionName?: string | undefined;
   label: string;
-  calendarType: "WEEKDAY" | "WEEKEND";
+  source: "IMPORTED" | "FALLBACK";
+  importedAt?: string | undefined;
+  sourceFileName?: string | undefined;
 }
 
 interface StoredTrain extends TrainDoc {
+  scheduleVersionId: string;
   scheduleVersionName?: string | undefined;
 }
 
-const DEFAULT_PDF_FILES = [
-  "/Users/zhouziteng/Desktop/G6001时刻表.pdf",
-  "/Users/zhouziteng/Desktop/Z6001时刻表.pdf",
-] as const;
+const FALLBACK_SCHEDULE_VERSION_ID = "demo-fallback";
+const FALLBACK_TRAINS: StoredTrain[] = [
+  {
+    trainNo: "G6001",
+    routeId: "R-1042",
+    direction: "UP",
+    scheduleVersionId: FALLBACK_SCHEDULE_VERSION_ID,
+    scheduleVersionName: "内置兜底时刻",
+    stations: [
+      {
+        stationName: "铜山中医院站",
+        departureTime: "08:15:00",
+        order: 0,
+      },
+      {
+        stationName: "玉泉河站",
+        arrivalTime: "08:35:00",
+        departureTime: "08:36:30",
+        order: 1,
+      },
+      {
+        stationName: "奥体中心站",
+        arrivalTime: "09:02:00",
+        departureTime: "09:03:30",
+        order: 2,
+      },
+      {
+        stationName: "徐州东站",
+        arrivalTime: "09:40:00",
+        order: 3,
+      },
+    ],
+  },
+  {
+    trainNo: "Z6001",
+    routeId: "R-1045",
+    direction: "DOWN",
+    scheduleVersionId: FALLBACK_SCHEDULE_VERSION_ID,
+    scheduleVersionName: "内置兜底时刻",
+    stations: [
+      {
+        stationName: "徐州东站",
+        departureTime: "08:22:00",
+        order: 0,
+      },
+      {
+        stationName: "奥体中心站",
+        arrivalTime: "08:50:00",
+        departureTime: "08:51:30",
+        order: 1,
+      },
+      {
+        stationName: "玉泉河站",
+        arrivalTime: "09:18:00",
+        departureTime: "09:19:30",
+        order: 2,
+      },
+      {
+        stationName: "铜山中医院站",
+        arrivalTime: "09:47:00",
+        order: 3,
+      },
+    ],
+  },
+  {
+    trainNo: "G6003",
+    routeId: "R-1051",
+    direction: "UP",
+    scheduleVersionId: FALLBACK_SCHEDULE_VERSION_ID,
+    scheduleVersionName: "内置兜底时刻",
+    stations: [
+      {
+        stationName: "铜山中医院站",
+        departureTime: "08:31:00",
+        order: 0,
+      },
+      {
+        stationName: "大湖站",
+        arrivalTime: "08:58:00",
+        departureTime: "08:59:30",
+        order: 1,
+      },
+      {
+        stationName: "奥体中心站",
+        arrivalTime: "09:25:00",
+        departureTime: "09:26:30",
+        order: 2,
+      },
+      {
+        stationName: "徐州东站",
+        arrivalTime: "09:56:00",
+        order: 3,
+      },
+    ],
+  },
+];
 
 @Injectable()
-export class RuntimeScheduleService implements OnModuleInit {
-  private readonly logger = new Logger(RuntimeScheduleService.name);
-  private readonly trains = new Map<string, StoredTrain>();
-
-  constructor(
-    @Inject(PdfOcrHybridParser) private readonly pdfParser: PdfOcrHybridParser,
-  ) {}
-
-  async onModuleInit(): Promise<void> {
-    await this.loadDefaultPdfSchedules();
-  }
-
-  upsertImportedDocument(doc: NormalizedImportDocument): void {
-    for (const train of doc.trains) {
-      if (train.stations.length === 0) continue;
-      this.trains.set(trainKey(train.trainNo, doc.meta.scheduleVersionName), {
-        ...train,
-        scheduleVersionName: doc.meta.scheduleVersionName,
-      });
-    }
-  }
+export class RuntimeScheduleService {
+  constructor(@Inject(TripStore) private readonly trips: TripStore) {}
 
   getActiveOperatingSchedule(now = new Date()): ActiveOperatingSchedule {
-    return activeOperatingSchedule(now);
+    return this.getRuntimeSnapshot(now).activeSchedule;
   }
 
   listLiveDuties(now = new Date()): LiveTrainDuty[] {
-    const activeSchedule = activeOperatingSchedule(now);
-    const activeTrains = Array.from(this.trains.values())
-      .filter((train) => trainMatchesSchedule(train, activeSchedule))
+    const snapshot = this.getRuntimeSnapshot(now);
+    const activeTrains = snapshot.trains
       .map((train) => ({ train, position: calculateTrainPosition(train, now) }))
       .filter(
         ({ position }) =>
@@ -89,12 +164,14 @@ export class RuntimeScheduleService implements OnModuleInit {
     return activeTrains
       .slice(0, DEMO_OPERATORS.length)
       .map(({ train, position }, index) => {
-        const operator = DEMO_OPERATORS[index % DEMO_OPERATORS.length]!;
+        const duty = findMatchingDuty(snapshot.duties, train);
+        const operator = operatorForDuty(duty, index);
         return {
           operatorId: operator.operatorId,
           operatorName: operator.operatorName,
           trainNo: train.trainNo,
           routeId: train.routeId,
+          scheduleVersionId: train.scheduleVersionId,
           scheduleVersionName: train.scheduleVersionName,
           direction: train.direction,
           ...position,
@@ -106,22 +183,46 @@ export class RuntimeScheduleService implements OnModuleInit {
       });
   }
 
-  private async loadDefaultPdfSchedules(): Promise<void> {
-    for (const filePath of DEFAULT_PDF_FILES) {
-      try {
-        const buffer = await readFile(filePath);
-        const doc = await this.pdfParser.extract(buffer, {
-          fileName: filePath.split("/").at(-1) ?? filePath,
-        });
-        this.upsertImportedDocument(doc);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        this.logger.warn(
-          `default schedule load failed: ${filePath}: ${message}`,
-        );
-      }
+  private getRuntimeSnapshot(_now: Date): {
+    activeSchedule: ActiveOperatingSchedule;
+    trains: StoredTrain[];
+    duties: DutyDoc[];
+  } {
+    const latest = this.trips.getLatestImportedScheduleVersion();
+    if (!latest) {
+      return {
+        activeSchedule: {
+          scheduleVersionId: FALLBACK_SCHEDULE_VERSION_ID,
+          scheduleVersionName: "内置兜底时刻",
+          label: "内置兜底时刻",
+          source: "FALLBACK",
+        },
+        trains: FALLBACK_TRAINS,
+        duties: [],
+      };
     }
-    this.logger.log(`runtime schedule loaded ${this.trains.size} trains`);
+
+    return {
+      activeSchedule: {
+        scheduleVersionId: latest.scheduleVersionId,
+        scheduleVersionName: latest.scheduleVersionName,
+        label: latest.scheduleVersionName ?? latest.scheduleVersionId,
+        source: "IMPORTED",
+        importedAt: latest.importedAt,
+        sourceFileName: latest.sourceFileName,
+      },
+      trains: this.trips
+        .listImportedTrains(latest.scheduleVersionId)
+        .filter((record) => record.data.stations.length > 0)
+        .map((record) => ({
+          ...record.data,
+          scheduleVersionId: record.scheduleVersionId,
+          scheduleVersionName: latest.scheduleVersionName,
+        })),
+      duties: this.trips
+        .listImportedDuties(latest.scheduleVersionId)
+        .map((record) => record.data),
+    };
   }
 }
 
@@ -134,6 +235,7 @@ function calculateTrainPosition(
   | "operatorName"
   | "trainNo"
   | "routeId"
+  | "scheduleVersionId"
   | "scheduleVersionName"
   | "direction"
   | "delaySeconds"
@@ -277,59 +379,44 @@ function clockTimeToSeconds(value: string): number {
   return hours * 3600 + minutes * 60 + seconds;
 }
 
-function trainKey(trainNo: string, scheduleVersionName?: string): string {
-  return `${scheduleVersionName ?? "default"}:${trainNo}`;
+function findMatchingDuty(
+  duties: DutyDoc[],
+  train: StoredTrain,
+): DutyDoc | undefined {
+  return duties.find(
+    (duty) =>
+      duty.trainNo === train.trainNo ||
+      (train.routeId !== undefined && duty.routeId === train.routeId),
+  );
 }
 
-function activeOperatingSchedule(date: Date): ActiveOperatingSchedule {
-  const weekday = shanghaiWeekday(date);
-  if (weekday === 0 || weekday === 6) {
+function operatorForDuty(
+  duty: DutyDoc | undefined,
+  fallbackIndex: number,
+): { operatorId: string; operatorName: string } {
+  if (!duty?.operatorName) {
+    const fallback = DEMO_OPERATORS[fallbackIndex % DEMO_OPERATORS.length]!;
     return {
-      scheduleVersionName: "Z6001",
-      label: "周末 Z6001 时刻表",
-      calendarType: "WEEKEND",
+      operatorId: fallback.operatorId,
+      operatorName: fallback.operatorName,
     };
   }
 
+  const known = DEMO_OPERATORS.find(
+    (operator) => operator.operatorName === duty.operatorName,
+  );
   return {
-    scheduleVersionName: "G6001",
-    label: "工作日 G6001 时刻表",
-    calendarType: "WEEKDAY",
+    operatorId:
+      known?.operatorId ?? `op-import-${shortHash(duty.operatorName)}`,
+    operatorName: duty.operatorName,
   };
 }
 
-function trainMatchesSchedule(
-  train: StoredTrain,
-  schedule: ActiveOperatingSchedule,
-): boolean {
-  return (
-    normalizeScheduleName(train.scheduleVersionName) ===
-      schedule.scheduleVersionName ||
-    normalizeScheduleName(train.routeId) === schedule.scheduleVersionName
-  );
-}
-
-function normalizeScheduleName(value: string | undefined): string | undefined {
-  const match = value?.match(/[GZ]6001/i);
-  return match?.[0]?.toUpperCase();
-}
-
-function shanghaiWeekday(date: Date): number {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Shanghai",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    })
-      .formatToParts(date)
-      .map((part) => [part.type, part.value]),
-  );
-  return new Date(
-    Date.UTC(
-      Number(parts.year),
-      Number(parts.month) - 1,
-      Number(parts.day),
-    ),
-  ).getUTCDay();
+function shortHash(value: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
 }

@@ -32,6 +32,16 @@ interface StoredImportRecord<T> {
   data: T;
 }
 
+export interface StoredScheduleVersion {
+  scheduleVersionId: string;
+  scheduleVersionName?: string | undefined;
+  sourceJobId: string;
+  sourceFileName: string;
+  importedAt: string;
+  scheduleDate: string;
+  acceptedSections: AcceptedImportSections;
+}
+
 interface ImportResult {
   scheduleVersionId: string;
   trains: number;
@@ -56,7 +66,8 @@ export class TripStore {
     string,
     StoredImportRecord<ImportDuty>
   >();
-  private readonly importDatesByVersion = new Map<string, string>();
+  private readonly importedVersions = new Map<string, StoredScheduleVersion>();
+  private latestImportedScheduleVersionId: string | undefined;
 
   constructor() {
     this.seed();
@@ -156,7 +167,17 @@ export class TripStore {
     const scheduleVersionId = buildScheduleVersionId(doc, jobId);
     const importedAt = new Date().toISOString();
     const scheduleDate = inferScheduleDate(doc) ?? importedAt.slice(0, 10);
-    this.importDatesByVersion.set(scheduleVersionId, scheduleDate);
+    this.clearImportedVersionRecords(scheduleVersionId);
+    this.importedVersions.set(scheduleVersionId, {
+      scheduleVersionId,
+      scheduleVersionName: doc.meta.scheduleVersionName,
+      sourceJobId: jobId,
+      sourceFileName: doc.meta.fileName,
+      importedAt,
+      scheduleDate,
+      acceptedSections,
+    });
+    this.latestImportedScheduleVersionId = scheduleVersionId;
 
     let trains = 0;
     let segments = 0;
@@ -221,6 +242,24 @@ export class TripStore {
     scheduleVersionId?: string,
   ): Array<StoredImportRecord<ImportDuty>> {
     return filterImportRecords(this.importedDuties, scheduleVersionId);
+  }
+
+  getLatestImportedScheduleVersion(): StoredScheduleVersion | undefined {
+    return this.latestImportedScheduleVersionId
+      ? this.importedVersions.get(this.latestImportedScheduleVersionId)
+      : undefined;
+  }
+
+  listImportedScheduleVersions(): StoredScheduleVersion[] {
+    return Array.from(this.importedVersions.values()).sort((a, b) =>
+      b.importedAt.localeCompare(a.importedAt),
+    );
+  }
+
+  private clearImportedVersionRecords(scheduleVersionId: string): void {
+    deleteMatchingRecords(this.importedTrains, scheduleVersionId);
+    deleteMatchingRecords(this.importedSegments, scheduleVersionId);
+    deleteMatchingRecords(this.importedDuties, scheduleVersionId);
   }
 
   private seed() {
@@ -320,7 +359,7 @@ export class TripStore {
     const lastStation = stations[stations.length - 1];
     const scheduleDate =
       duties.find((duty) => duty.data.dutyDate)?.data.dutyDate ??
-      this.importDatesByVersion.get(record.scheduleVersionId) ??
+      this.importedVersions.get(record.scheduleVersionId)?.scheduleDate ??
       record.importedAt.slice(0, 10);
     const departureClock =
       firstStation?.departureTime ??
@@ -393,6 +432,15 @@ function filterImportRecords<T>(
       scheduleVersionId === undefined ||
       record.scheduleVersionId === scheduleVersionId,
   );
+}
+
+function deleteMatchingRecords<T>(
+  records: Map<string, StoredImportRecord<T>>,
+  scheduleVersionId: string,
+): void {
+  for (const [key, record] of records) {
+    if (record.scheduleVersionId === scheduleVersionId) records.delete(key);
+  }
 }
 
 function buildScheduleVersionId(
