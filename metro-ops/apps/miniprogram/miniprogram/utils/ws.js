@@ -7,6 +7,7 @@ class RealtimeSocket {
     this.listeners = new Set();
     this.rooms = new Set();
     this.opening = false;
+    this.connected = false;
   }
 
   connect() {
@@ -15,7 +16,8 @@ class RealtimeSocket {
     this.socket = wx.connectSocket({ url: buildWsUrl(this.path) });
     this.socket.onOpen(() => {
       this.opening = false;
-      this.subscribe(Array.from(this.rooms));
+      this.connected = true;
+      this.flushSubscriptions();
     });
     this.socket.onMessage((evt) => {
       try {
@@ -28,10 +30,12 @@ class RealtimeSocket {
     this.socket.onClose(() => {
       this.socket = null;
       this.opening = false;
+      this.connected = false;
     });
     this.socket.onError(() => {
       this.socket = null;
       this.opening = false;
+      this.connected = false;
     });
   }
 
@@ -42,19 +46,27 @@ class RealtimeSocket {
 
   subscribe(rooms) {
     for (const room of rooms) this.rooms.add(room);
-    if (!this.socket) {
+    if (!this.socket || this.opening || !this.connected) {
       this.connect();
       return;
     }
-    this.socket.send({
-      data: JSON.stringify({ type: "subscribe", rooms }),
-    });
+    this.flushSubscriptions();
   }
 
   close() {
     this.socket?.close({});
     this.socket = null;
     this.opening = false;
+    this.connected = false;
+  }
+
+  flushSubscriptions() {
+    if (!this.socket || !this.connected) return;
+    const rooms = Array.from(this.rooms);
+    if (rooms.length === 0) return;
+    this.socket.send({
+      data: JSON.stringify({ type: "subscribe", rooms }),
+    });
   }
 }
 

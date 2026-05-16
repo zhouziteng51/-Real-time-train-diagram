@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import type { Direction, NormalizedImportDocument } from "@metro-ops/shared";
 import { DEMO_OPERATORS } from "../operator/operator.fixtures.js";
-import { TripStore } from "../trip/trip.store.js";
+import { FALLBACK_SCHEDULE_VERSION_ID, TripStore } from "../trip/trip.store.js";
 
 type TrainDoc = NormalizedImportDocument["trains"][number];
 type StationDoc = TrainDoc["stations"][number];
@@ -40,7 +40,6 @@ interface StoredTrain extends TrainDoc {
   scheduleVersionName?: string | undefined;
 }
 
-const FALLBACK_SCHEDULE_VERSION_ID = "demo-fallback";
 const FALLBACK_TRAINS: StoredTrain[] = [
   {
     trainNo: "G6001",

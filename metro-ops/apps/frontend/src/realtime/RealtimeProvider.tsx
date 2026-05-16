@@ -26,7 +26,7 @@ interface Props {
 export function RealtimeProvider({ children }: Props) {
   const qc = useQueryClient();
   const setStatus = useRealtimeStore((s) => s.setConnectionStatus);
-  const merge = useRealtimeStore((s) => s.mergeVehicles);
+  const replaceVehicles = useRealtimeStore((s) => s.replaceVehicles);
   const upsertJob = useImportStore((s) => s.upsertJob);
   const currentJobId = useImportStore((s) => s.currentJobId);
   const selectedTripId = useAppStore((s) => s.selectedTripId);
@@ -50,7 +50,9 @@ export function RealtimeProvider({ children }: Props) {
 
   useEffect(() => {
     if (!WS_URL) return;
-    const batcher = new RafBatcher((items, sentAt) => merge(items, sentAt));
+    const batcher = new RafBatcher((items, sentAt) =>
+      replaceVehicles(items, sentAt),
+    );
     batcherRef.current = batcher;
 
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
@@ -107,6 +109,7 @@ export function RealtimeProvider({ children }: Props) {
             qc.invalidateQueries({ queryKey: ["imports"] });
             qc.invalidateQueries({ queryKey: ["imports", msg.data.job.id] });
             if (msg.data.job.status === "IMPORTED") {
+              qc.invalidateQueries({ queryKey: ["runtime", "duties"] });
               qc.invalidateQueries({ queryKey: ["trips", "active"] });
               qc.invalidateQueries({ queryKey: ["trips", "history"] });
             }
@@ -141,7 +144,7 @@ export function RealtimeProvider({ children }: Props) {
       batcherRef.current = null;
       socketRef.current?.close();
     };
-  }, [merge, qc, setStatus, upsertJob]);
+  }, [qc, replaceVehicles, setStatus, upsertJob]);
 
   return <>{children}</>;
 }

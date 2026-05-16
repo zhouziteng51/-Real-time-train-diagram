@@ -23,7 +23,8 @@ interface TripMutationResponse {
 }
 
 export function AttachedRoutePage() {
-  const { tripId = "trip-demo-1" } = useParams();
+  const params = useParams();
+  const tripId = params.tripId;
   const qc = useQueryClient();
   const navigate = useNavigate();
   const archivePending = useAppStore((s) => s.archivePending);
@@ -31,6 +32,7 @@ export function AttachedRoutePage() {
   const setSelectedTrip = useAppStore((s) => s.setSelectedTrip);
 
   useEffect(() => {
+    if (!tripId) return;
     setSelectedTrip({ tripId });
     return () => setSelectedTrip(undefined);
   }, [setSelectedTrip, tripId]);
@@ -38,6 +40,7 @@ export function AttachedRoutePage() {
   const tripQuery = useQuery({
     queryKey: ["trip", tripId],
     queryFn: () => apiFetch<TripDetailResponse>(`/api/trips/${tripId}`),
+    enabled: !!tripId,
   });
 
   const applyTripMutationResult = (res: TripMutationResponse) => {
@@ -86,6 +89,14 @@ export function AttachedRoutePage() {
   });
 
   const trip = tripQuery.data?.trip;
+
+  if (!tripId) {
+    return (
+      <div className="max-w-3xl mx-auto mt-6 px-margin-mobile text-sm text-on-surface-variant">
+        交路任务不存在
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto mt-6 px-margin-mobile">

@@ -1,6 +1,8 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { Direction, RealtimeVehicleStatus } from "@metro-ops/shared";
 import { apiFetch } from "../api/client.js";
+import { useAppStore } from "../store/index.js";
 import {
   directionLabel,
   locationKindLabel,
@@ -55,6 +57,9 @@ interface CurrentDutiesResponse {
 }
 
 export function DashboardPage() {
+  const setActiveScheduleVersion = useAppStore(
+    (s) => s.setActiveScheduleVersion,
+  );
   const runtime = useQuery({
     queryKey: ["runtime", "duties"],
     queryFn: () => apiFetch<CurrentDutiesResponse>("/api/runtime/duties"),
@@ -70,6 +75,10 @@ export function DashboardPage() {
   const dwellingCount = duties.filter(
     (duty) => duty.status === "DWELLING",
   ).length;
+
+  useEffect(() => {
+    setActiveScheduleVersion(activeSchedule?.scheduleVersionId);
+  }, [activeSchedule?.scheduleVersionId, setActiveScheduleVersion]);
 
   return (
     <div className="p-margin-mobile md:p-lg max-w-7xl mx-auto space-y-md">

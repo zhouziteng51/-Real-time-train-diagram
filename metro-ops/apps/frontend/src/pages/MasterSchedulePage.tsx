@@ -1,16 +1,49 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import type { TripTask } from "@metro-ops/shared";
 import { apiFetch } from "../api/client.js";
 import { goToHistoryFromMasterSchedule } from "../navigation/toHistory.js";
 import { tripStatusLabel } from "../format/display.js";
+import { useAppStore } from "../store/index.js";
+
+interface ActiveOperatingSchedule {
+  scheduleVersionId: string;
+  scheduleVersionName?: string | undefined;
+  label: string;
+  source: "IMPORTED" | "FALLBACK";
+  importedAt?: string | undefined;
+  sourceFileName?: string | undefined;
+}
+
+interface CurrentDutiesResponse {
+  activeSchedule: ActiveOperatingSchedule;
+}
 
 export function MasterSchedulePage() {
   const navigate = useNavigate();
+  const setActiveScheduleVersion = useAppStore(
+    (s) => s.setActiveScheduleVersion,
+  );
+  const runtime = useQuery({
+    queryKey: ["runtime", "duties"],
+    queryFn: () => apiFetch<CurrentDutiesResponse>("/api/runtime/duties"),
+  });
   const active = useQuery({
     queryKey: ["trips", "active"],
     queryFn: () => apiFetch<TripTask[]>("/api/trips/active"),
   });
+
+  useEffect(() => {
+    const versionId =
+      runtime.data?.activeSchedule.scheduleVersionId ??
+      active.data?.[0]?.scheduleVersionId;
+    setActiveScheduleVersion(versionId);
+  }, [
+    active.data?.[0]?.scheduleVersionId,
+    runtime.data?.activeSchedule.scheduleVersionId,
+    setActiveScheduleVersion,
+  ]);
 
   return (
     <div className="max-w-4xl mx-auto p-margin-mobile md:p-lg space-y-md">

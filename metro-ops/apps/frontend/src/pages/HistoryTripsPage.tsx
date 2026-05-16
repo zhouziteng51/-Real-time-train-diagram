@@ -3,8 +3,21 @@ import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import type { TripTask } from "@metro-ops/shared";
 import { apiFetch } from "../api/client.js";
-import { useHistoryQueryStore } from "../store/index.js";
+import { useAppStore, useHistoryQueryStore } from "../store/index.js";
 import { queryKeyLabel, tripStatusLabel } from "../format/display.js";
+
+interface ActiveOperatingSchedule {
+  scheduleVersionId: string;
+  scheduleVersionName?: string | undefined;
+  label: string;
+  source: "IMPORTED" | "FALLBACK";
+  importedAt?: string | undefined;
+  sourceFileName?: string | undefined;
+}
+
+interface CurrentDutiesResponse {
+  activeSchedule: ActiveOperatingSchedule;
+}
 
 const FROM_LABEL: Record<string, string> = {
   "attached-route": "随车交路",
@@ -17,22 +30,57 @@ export function HistoryTripsPage() {
   const hydrate = useHistoryQueryStore((s) => s.hydrateFromUrl);
   const query = useHistoryQueryStore((s) => s.query);
   const from = params.get("from");
+  const activeScheduleVersionId = useAppStore(
+    (s) => s.activeScheduleVersionId,
+  );
+  const setActiveScheduleVersion = useAppStore(
+    (s) => s.setActiveScheduleVersion,
+  );
+
+  const runtime = useQuery({
+    queryKey: ["runtime", "duties"],
+    queryFn: () => apiFetch<CurrentDutiesResponse>("/api/runtime/duties"),
+  });
 
   useEffect(() => {
     hydrate(params);
   }, [params, hydrate]);
 
+  useEffect(() => {
+    const versionId = runtime.data?.activeSchedule.scheduleVersionId;
+    if (versionId) setActiveScheduleVersion(versionId);
+  }, [runtime.data?.activeSchedule.scheduleVersionId, setActiveScheduleVersion]);
+
+  const effectiveQuery = useMemo(() => {
+    const scheduleVersionId =
+      query.scheduleVersionId ??
+      runtime.data?.activeSchedule.scheduleVersionId ??
+      activeScheduleVersionId;
+    return {
+      ...query,
+      ...(scheduleVersionId ? { scheduleVersionId } : {}),
+    };
+  }, [
+    activeScheduleVersionId,
+    query,
+    runtime.data?.activeSchedule.scheduleVersionId,
+  ]);
+
   const qs = useMemo(() => {
     const sp = new URLSearchParams();
-    for (const [k, v] of Object.entries(query)) {
+    for (const [k, v] of Object.entries(effectiveQuery)) {
       if (v !== undefined && v !== "") sp.set(k, String(v));
     }
     return sp.toString();
-  }, [query]);
+  }, [effectiveQuery]);
 
   const history = useQuery({
     queryKey: ["trips", "history", qs],
-    queryFn: () => apiFetch<TripTask[]>(`/api/trips/history${qs ? `?${qs}` : ""}`),
+    queryFn: () =>
+      apiFetch<TripTask[]>(`/api/trips/history${qs ? `?${qs}` : ""}`),
+    enabled:
+      !!runtime.data?.activeSchedule.scheduleVersionId ||
+      !!activeScheduleVersionId,
   });
 
   return (
@@ -46,7 +94,7 @@ export function HistoryTripsPage() {
       <section className="bg-surface rounded-xl border border-outline-variant shadow-sm p-md">
         <h1 className="text-[20px] font-semibold mb-sm">历史车次</h1>
         <dl className="grid grid-cols-2 md:grid-cols-3 gap-sm text-[12px]">
-          {Object.entries(query).map(([k, v]) => (
+          {Object.entries(effectiveQuery).map(([k, v]) => (
             <div key={k} className="flex justify-between font-mono">
               <dt className="text-on-surface-variant">{queryKeyLabel(k)}</dt>
               <dd className="font-semibold">{String(v)}</dd>

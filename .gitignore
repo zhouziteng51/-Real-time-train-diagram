@@ -16,3 +16,4 @@ coverage/
 !.env.example
 
 *.tsbuildinfo
+**/project.private.config.json

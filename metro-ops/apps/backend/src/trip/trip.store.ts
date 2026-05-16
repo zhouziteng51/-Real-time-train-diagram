@@ -50,10 +50,14 @@ interface ImportResult {
   projectedTrips: number;
 }
 
+export const FALLBACK_SCHEDULE_VERSION_ID = "demo-fallback";
+
 @Injectable()
 export class TripStore {
   private readonly trips = new Map<string, TripTask>();
   private readonly events: TripEvent[] = [];
+  private readonly demoTripIds = new Set<string>();
+  private readonly importedTripIdsByVersion = new Map<string, Set<string>>();
   private readonly importedTrains = new Map<
     string,
     StoredImportRecord<ImportTrain>
@@ -78,7 +82,7 @@ export class TripStore {
   }
 
   active(): TripTask[] {
-    return this.list().filter(
+    return this.getOperationalTrips().filter(
       (t) =>
         t.status === "PLANNED" ||
         t.status === "ACTIVE" ||
@@ -137,26 +141,28 @@ export class TripStore {
     const hasSpecificFilter = Object.values(filter).some(
       (value) => value !== undefined && value !== "",
     );
-    return this.list().filter((t) => {
-      if (filter.tripId && t.id !== filter.tripId) return false;
-      if (filter.trainNo && t.trainNo !== filter.trainNo) return false;
-      if (filter.routeId && t.routeId !== filter.routeId) return false;
-      if (
-        filter.scheduleVersionId &&
-        t.scheduleVersionId !== filter.scheduleVersionId
-      )
-        return false;
-      if (
-        filter.operatorName &&
-        !this.tripMatchesOperatorName(t, filter.operatorName)
-      )
-        return false;
-      if (filter.date && !t.plannedDepartureAt.startsWith(filter.date))
-        return false;
-      if (!hasSpecificFilter)
-        return t.status === "ARCHIVED" || t.status === "CANCELLED";
-      return true;
-    });
+    return this.getHistoryCandidateTrips(filter.scheduleVersionId).filter(
+      (t) => {
+        if (filter.tripId && t.id !== filter.tripId) return false;
+        if (filter.trainNo && t.trainNo !== filter.trainNo) return false;
+        if (filter.routeId && t.routeId !== filter.routeId) return false;
+        if (
+          filter.scheduleVersionId &&
+          t.scheduleVersionId !== filter.scheduleVersionId
+        )
+          return false;
+        if (
+          filter.operatorName &&
+          !this.tripMatchesOperatorName(t, filter.operatorName)
+        )
+          return false;
+        if (filter.date && !t.plannedDepartureAt.startsWith(filter.date))
+          return false;
+        if (!hasSpecificFilter)
+          return t.status === "ARCHIVED" || t.status === "CANCELLED";
+        return true;
+      },
+    );
   }
 
   upsertImportedDocument(
@@ -262,6 +268,43 @@ export class TripStore {
     deleteMatchingRecords(this.importedDuties, scheduleVersionId);
   }
 
+  private getOperationalTrips(): TripTask[] {
+    const latest = this.getLatestImportedScheduleVersion();
+    if (!latest) return this.listDemoTrips();
+    return this.listImportedTripsForVersion(latest.scheduleVersionId);
+  }
+
+  private getHistoryCandidateTrips(scheduleVersionId?: string): TripTask[] {
+    if (scheduleVersionId) {
+      return this.listTripsForScheduleVersion(scheduleVersionId);
+    }
+
+    return this.getOperationalTrips();
+  }
+
+  private listTripsForScheduleVersion(scheduleVersionId: string): TripTask[] {
+    if (this.importedVersions.has(scheduleVersionId)) {
+      return this.listImportedTripsForVersion(scheduleVersionId);
+    }
+
+    if (this.getLatestImportedScheduleVersion()) return [];
+
+    return this.list().filter(
+      (trip) => trip.scheduleVersionId === scheduleVersionId,
+    );
+  }
+
+  private listImportedTripsForVersion(scheduleVersionId: string): TripTask[] {
+    const ids = this.importedTripIdsByVersion.get(scheduleVersionId);
+    if (!ids) return [];
+
+    return this.list().filter((trip) => ids.has(trip.id));
+  }
+
+  private listDemoTrips(): TripTask[] {
+    return this.list().filter((trip) => this.demoTripIds.has(trip.id));
+  }
+
   private seed() {
     const today = new Date().toISOString().slice(0, 10);
     const trips: TripTask[] = [
@@ -272,7 +315,7 @@ export class TripStore {
         direction: "UP",
         originStationId: "铜山中医院站",
         terminalStationId: "徐州东站",
-        scheduleVersionId: "G6001",
+        scheduleVersionId: FALLBACK_SCHEDULE_VERSION_ID,
         plannedDepartureAt: `${today}T08:15:00+08:00`,
         plannedArrivalAt: `${today}T09:40:00+08:00`,
         assignedOperatorIds: ["op-001"],
@@ -285,7 +328,7 @@ export class TripStore {
         direction: "DOWN",
         originStationId: "徐州东站",
         terminalStationId: "铜山中医院站",
-        scheduleVersionId: "Z6001",
+        scheduleVersionId: FALLBACK_SCHEDULE_VERSION_ID,
         plannedDepartureAt: `${today}T08:22:00+08:00`,
         plannedArrivalAt: `${today}T09:47:00+08:00`,
         assignedOperatorIds: ["op-002"],
@@ -298,7 +341,7 @@ export class TripStore {
         direction: "UP",
         originStationId: "铜山中医院站",
         terminalStationId: "徐州东站",
-        scheduleVersionId: "G6001",
+        scheduleVersionId: FALLBACK_SCHEDULE_VERSION_ID,
         plannedDepartureAt: `${today}T08:31:00+08:00`,
         plannedArrivalAt: `${today}T09:56:00+08:00`,
         assignedOperatorIds: ["op-003"],
@@ -306,16 +349,23 @@ export class TripStore {
       },
     ];
 
-    for (const trip of trips) this.trips.set(trip.id, trip);
+    for (const trip of trips) {
+      this.demoTripIds.add(trip.id);
+      this.trips.set(trip.id, trip);
+    }
   }
 
   private rebuildTripsForVersion(scheduleVersionId: string): number {
     const trains = this.listImportedTrains(scheduleVersionId);
+    const previousTripIds =
+      this.importedTripIdsByVersion.get(scheduleVersionId) ?? new Set<string>();
+    const nextTripIds = new Set<string>();
     let projected = 0;
 
     for (const record of trains) {
       const trip = this.projectTrip(record);
       const existing = this.trips.get(trip.id);
+      nextTripIds.add(trip.id);
       this.trips.set(trip.id, {
         ...trip,
         ...(existing
@@ -332,6 +382,11 @@ export class TripStore {
       });
       projected += 1;
     }
+
+    for (const id of previousTripIds) {
+      if (!nextTripIds.has(id)) this.trips.delete(id);
+    }
+    this.importedTripIdsByVersion.set(scheduleVersionId, nextTripIds);
 
     return projected;
   }

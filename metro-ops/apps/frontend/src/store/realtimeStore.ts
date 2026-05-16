@@ -8,17 +8,16 @@ interface RealtimeStoreState {
   lastSyncAt?: string;
   vehiclesById: Record<string, RealtimeVehicleState>;
   setConnectionStatus: (status: ConnectionStatus) => void;
-  mergeVehicles: (items: RealtimeVehicleState[], sentAt: string) => void;
+  replaceVehicles: (items: RealtimeVehicleState[], sentAt: string) => void;
 }
 
 export const useRealtimeStore = create<RealtimeStoreState>((set) => ({
   connectionStatus: "OFFLINE",
   vehiclesById: {},
   setConnectionStatus: (status) => set({ connectionStatus: status }),
-  mergeVehicles: (items, sentAt) =>
+  replaceVehicles: (items, sentAt) =>
     set((state) => {
-      if (items.length === 0) return state;
-      const next = { ...state.vehiclesById };
+      const next: Record<string, RealtimeVehicleState> = {};
       for (const v of items) next[v.vehicleId] = v;
       return { vehiclesById: next, lastSyncAt: sentAt };
     }),

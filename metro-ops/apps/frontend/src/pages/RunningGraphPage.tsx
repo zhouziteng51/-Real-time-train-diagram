@@ -6,7 +6,15 @@ export function RunningGraphPage() {
   const vehicles = useRealtimeStore((s) => s.vehiclesById);
   const lastSyncAt = useRealtimeStore((s) => s.lastSyncAt);
 
-  const rows = useMemo(() => Object.values(vehicles), [vehicles]);
+  const rows = useMemo(
+    () =>
+      Object.values(vehicles).sort(
+        (a, b) =>
+          a.trainNo.localeCompare(b.trainNo) ||
+          (a.tripId ?? "").localeCompare(b.tripId ?? ""),
+      ),
+    [vehicles],
+  );
 
   return (
     <div className="p-margin-mobile md:p-lg max-w-7xl mx-auto">
@@ -35,7 +43,12 @@ export function RunningGraphPage() {
             <tbody>
               {rows.map((v) => (
                 <tr key={v.vehicleId} className="border-t border-outline-variant">
-                  <td className="p-sm font-mono font-bold">{v.trainNo}</td>
+                  <td className="p-sm">
+                    <div className="font-mono font-bold">{v.trainNo}</div>
+                    <div className="text-[11px] text-on-surface-variant font-mono">
+                      {v.tripId ?? "--"}
+                    </div>
+                  </td>
                   <td className="p-sm font-mono">{v.routeId}</td>
                   <td className="p-sm">{realtimeStatusLabel(v.status)}</td>
                   <td className="p-sm font-mono">{v.speedKph?.toFixed(0) ?? 0} 公里/小时</td>

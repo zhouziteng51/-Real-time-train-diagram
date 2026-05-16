@@ -1,7 +1,8 @@
-import { createBrowserRouter, Navigate } from "react-router-dom";
+import { createBrowserRouter } from "react-router-dom";
 import { AppShell } from "./components/AppShell.js";
 import { DashboardPage } from "./pages/DashboardPage.js";
 import { RunningGraphPage } from "./pages/RunningGraphPage.js";
+import { AttachedRouteEntry } from "./pages/AttachedRouteEntry.js";
 import { AttachedRoutePage } from "./pages/AttachedRoutePage.js";
 import { MasterSchedulePage } from "./pages/MasterSchedulePage.js";
 import { HistoryTripsPage } from "./pages/HistoryTripsPage.js";
@@ -14,7 +15,7 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
     children: [
       { index: true, element: <DashboardPage /> },
       { path: "running-graph", element: <RunningGraphPage /> },
-      { path: "attached-route", element: <Navigate to="/attached-route/trip-demo-1" replace /> },
+      { path: "attached-route", element: <AttachedRouteEntry /> },
       { path: "attached-route/:tripId", element: <AttachedRoutePage /> },
       { path: "master-schedule", element: <MasterSchedulePage /> },
       { path: "history-trips", element: <HistoryTripsPage /> },

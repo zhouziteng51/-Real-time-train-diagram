@@ -6,12 +6,14 @@ export class RafBatcher {
   private queue: RealtimeVehicleState[] = [];
   private lastSentAt = "";
   private scheduled = false;
+  private hasPendingFlush = false;
 
   constructor(private readonly flush: FlushFn) {}
 
   push(items: RealtimeVehicleState[], sentAt: string): void {
     this.queue.push(...items);
     this.lastSentAt = sentAt;
+    this.hasPendingFlush = true;
     if (!this.scheduled) {
       this.scheduled = true;
       const schedule =
@@ -24,10 +26,11 @@ export class RafBatcher {
 
   private drain(): void {
     this.scheduled = false;
-    if (this.queue.length === 0) return;
+    if (!this.hasPendingFlush) return;
     const dedup = new Map<string, RealtimeVehicleState>();
     for (const v of this.queue) dedup.set(v.vehicleId, v);
     this.queue = [];
+    this.hasPendingFlush = false;
     this.flush(Array.from(dedup.values()), this.lastSentAt);
   }
 }
