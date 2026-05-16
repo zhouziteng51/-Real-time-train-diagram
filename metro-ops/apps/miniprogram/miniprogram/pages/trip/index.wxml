@@ -1,0 +1,28 @@
+<view class="page">
+  <view wx:if="{{trip}}" class="card">
+    <view class="row">
+      <view class="stack">
+        <view class="title">{{trip.trainNo}} · {{trip.routeId}}</view>
+        <view class="subtle">{{trip.originStationId}} → {{trip.terminalStationId}}</view>
+      </view>
+      <view class="pill {{statusClass}}">{{tripStatus}}</view>
+    </view>
+    <view class="subtle" style="margin-top: 16rpx;">计划 {{departureTime}} - {{arrivalTime}}</view>
+  </view>
+
+  <view wx:if="{{trip}}" class="card">
+    <view class="title">事件流</view>
+    <block wx:for="{{events}}" wx:key="id">
+      <view class="event-row">
+        <view class="subtle">{{item.occurredAtTime}}</view>
+        <view>{{item.kind}}</view>
+        <view class="subtle">{{item.fromStatus}} → {{item.toStatus}}</view>
+      </view>
+    </block>
+    <view wx:if="{{events.length === 0}}" class="subtle">暂无事件</view>
+  </view>
+
+  <view wx:if="{{!trip}}" class="card">
+    <view class="subtle">未找到任务</view>
+  </view>
+</view>

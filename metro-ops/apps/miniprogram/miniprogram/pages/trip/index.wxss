@@ -1,0 +1,11 @@
+.event-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 18rpx 0;
+  border-top: 1px solid #e2e8f0;
+}
+
+.event-row:first-of-type {
+  border-top: 0;
+}

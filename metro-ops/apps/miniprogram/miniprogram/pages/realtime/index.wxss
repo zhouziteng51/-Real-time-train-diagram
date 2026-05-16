@@ -1,0 +1,16 @@
+.trip-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 0;
+  border-top: 1px solid #e2e8f0;
+}
+
+.trip-row:first-of-type {
+  border-top: 0;
+}
+
+.font-bold {
+  font-size: 30rpx;
+  font-weight: 600;
+}

@@ -1,0 +1,13 @@
+{
+  "pages": [
+    "pages/home/index",
+    "pages/trip/index",
+    "pages/realtime/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "实时时刻表",
+    "navigationBarBackgroundColor": "#0f172a",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f8fafc"
+  }
+}

@@ -1,0 +1,50 @@
+<view class="page">
+  <view class="card">
+    <view class="row">
+      <view>
+        <view class="title">当前任务</view>
+        <view class="subtle">{{operatorName}} · {{operatorId}}</view>
+      </view>
+      <view class="pill pill-primary">{{connectionLabel}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{trip}}" class="card">
+    <view class="row">
+      <view class="stack">
+        <view class="pill {{statusClass}}">{{tripStatus}}</view>
+        <view class="title">{{trip.trainNo}} · {{trip.routeId}}</view>
+        <view class="subtle">{{trip.originStationId}} → {{trip.terminalStationId}}</view>
+      </view>
+      <view class="stack" style="text-align:right;">
+        <view class="subtle">计划发车</view>
+        <view>{{departureTime}}</view>
+        <view class="subtle">计划到达</view>
+        <view>{{arrivalTime}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{trip}}" class="button-row">
+    <button class="btn btn-primary" disabled="{{trip.status !== 'PLANNED' || loading}}" bindtap="handleStart">开始值乘</button>
+    <button class="btn btn-muted" disabled="{{trip.status !== 'ACTIVE' || loading}}" bindtap="handleArrive">标记终到</button>
+    <button class="btn btn-secondary" disabled="{{trip.status !== 'ARRIVING_TERMINAL' || loading}}" bindtap="handleArchive">归档</button>
+  </view>
+
+  <view class="card">
+    <view class="row">
+      <view class="title">实时车次</view>
+      <navigator url="/pages/realtime/index" class="subtle">查看全部</navigator>
+    </view>
+    <block wx:for="{{activeTrips}}" wx:key="id">
+      <navigator url="/pages/trip/index?id={{item.id}}" class="trip-row">
+        <view class="stack">
+          <view class="font-bold">{{item.trainNo}} · {{item.routeId}}</view>
+          <view class="subtle">{{item.originStationId}} → {{item.terminalStationId}}</view>
+        </view>
+        <view class="pill {{item.statusClass}}">{{item.statusLabel}}</view>
+      </navigator>
+    </block>
+    <view wx:if="{{activeTrips.length === 0}}" class="subtle">暂无任务</view>
+  </view>
+</view>
