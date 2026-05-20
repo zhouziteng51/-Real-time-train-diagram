@@ -23,6 +23,7 @@ import type { TripEvent, TripTask } from "@metro-ops/shared";
 import { TripStore } from "./trip.store.js";
 import { RealtimeGateway } from "../realtime/realtime.gateway.js";
 import { RealtimeModule } from "../realtime/realtime.module.js";
+import { Roles } from "../auth/roles.decorator.js";
 
 @Controller("api/trips")
 export class TripController {
@@ -37,6 +38,7 @@ export class TripController {
   }
 
   @Get("history")
+  @Roles("DISPATCHER")
   history(@Query() query: unknown): TripTask[] {
     const parsed = HistoryTripQuerySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
@@ -99,6 +101,7 @@ export class TripController {
   }
 
   @Post(":tripId/archive")
+  @Roles("DISPATCHER")
   @HttpCode(200)
   archive(@Param("tripId") tripId: string, @Body() body: unknown) {
     const parsed = ArchiveTripBodySchema.safeParse(body);

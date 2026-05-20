@@ -1,13 +1,18 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, OnModuleInit } from "@nestjs/common";
 import type { Direction, NormalizedImportDocument } from "@metro-ops/shared";
 import { DEMO_OPERATORS } from "../operator/operator.fixtures.js";
 import { FALLBACK_SCHEDULE_VERSION_ID, TripStore } from "../trip/trip.store.js";
+import { readFile } from "node:fs/promises";
+import { PdfOcrHybridParser } from "../import/parsers/normalize.js";
 
 type TrainDoc = NormalizedImportDocument["trains"][number];
 type StationDoc = TrainDoc["stations"][number];
 type DutyDoc = NormalizedImportDocument["dutyAssignments"][number];
 
 export interface LiveTrainDuty {
+  dutyRouteNo?: string | undefined;
+  dutyRouteId?: string | undefined;
+  dutyShiftName?: string | undefined;
   operatorId: string;
   operatorName: string;
   trainNo: string;
@@ -39,6 +44,11 @@ interface StoredTrain extends TrainDoc {
   scheduleVersionId: string;
   scheduleVersionName?: string | undefined;
 }
+
+const DEFAULT_PDF_FILES = {
+  G6001: "/Users/zhouziteng/Desktop/实时时刻表/G6001时刻表.pdf",
+  Z6001: "/Users/zhouziteng/Desktop/实时时刻表/Z6001时刻表.pdf",
+} as const;
 
 const FALLBACK_TRAINS: StoredTrain[] = [
   {
@@ -137,15 +147,27 @@ const FALLBACK_TRAINS: StoredTrain[] = [
 ];
 
 @Injectable()
-export class RuntimeScheduleService {
-  constructor(@Inject(TripStore) private readonly trips: TripStore) {}
+export class RuntimeScheduleService implements OnModuleInit {
+  constructor(
+    @Inject(TripStore) private readonly trips: TripStore,
+    @Inject(PdfOcrHybridParser) private readonly pdfParser: PdfOcrHybridParser,
+  ) {}
+
+  async onModuleInit(): Promise<void> {
+    await this.loadDefaultPdfSchedules();
+  }
 
   getActiveOperatingSchedule(now = new Date()): ActiveOperatingSchedule {
-    return this.getRuntimeSnapshot(now).activeSchedule;
+    return this.resolveOperatingSchedule(now).activeSchedule;
   }
 
   listLiveDuties(now = new Date()): LiveTrainDuty[] {
-    const snapshot = this.getRuntimeSnapshot(now);
+    const snapshot = this.resolveOperatingSchedule(now);
+    const dutyDate = shanghaiLocalDate(now);
+    const duties = snapshot.duties.filter(
+      (duty) => !duty.dutyDate || duty.dutyDate === dutyDate,
+    );
+    const hasImportedDutyAssignments = duties.length > 0;
     const activeTrains = snapshot.trains
       .map((train) => ({ train, position: calculateTrainPosition(train, now) }))
       .filter(
@@ -161,18 +183,30 @@ export class RuntimeScheduleService {
       );
 
     return activeTrains
-      .slice(0, DEMO_OPERATORS.length)
+      .slice(
+        0,
+        hasImportedDutyAssignments ? activeTrains.length : DEMO_OPERATORS.length,
+      )
       .map(({ train, position }, index) => {
-        const duty = findMatchingDuty(snapshot.duties, train);
-        const operator = operatorForDuty(duty, index);
+        const duty = findMatchingDuty(duties, train);
+        const dutyRoute = routeForDuty(duty, train);
+        const operator = operatorForDuty(
+          duty,
+          index,
+          hasImportedDutyAssignments,
+          train.trainNo,
+        );
         return {
+          dutyRouteNo: dutyRoute.routeNo,
+          dutyRouteId: dutyRoute.routeId,
+          dutyShiftName: dutyRoute.shiftName,
           operatorId: operator.operatorId,
           operatorName: operator.operatorName,
           trainNo: train.trainNo,
           routeId: train.routeId,
           scheduleVersionId: train.scheduleVersionId,
           scheduleVersionName: train.scheduleVersionName,
-          direction: train.direction,
+          direction: inferDirectionFromStations(train.stations) ?? train.direction,
           ...position,
           delaySeconds: 0,
           status:
@@ -182,46 +216,139 @@ export class RuntimeScheduleService {
       });
   }
 
-  private getRuntimeSnapshot(_now: Date): {
+  private resolveOperatingSchedule(now: Date): {
     activeSchedule: ActiveOperatingSchedule;
     trains: StoredTrain[];
     duties: DutyDoc[];
   } {
-    const latest = this.trips.getLatestImportedScheduleVersion();
-    if (!latest) {
+    const requested = this.pickOperatingScheduleForDate(now);
+    const imported = this.trips.getImportedScheduleVersion(
+      requested.scheduleVersionId,
+    );
+
+    if (!imported) {
       return {
         activeSchedule: {
           scheduleVersionId: FALLBACK_SCHEDULE_VERSION_ID,
           scheduleVersionName: "内置兜底时刻",
-          label: "内置兜底时刻",
+          label: requested.label,
           source: "FALLBACK",
+          sourceFileName: requested.sourceFileName,
         },
-        trains: FALLBACK_TRAINS,
+        trains: this.getFallbackTrains(requested.scheduleVersionId),
         duties: [],
       };
     }
 
     return {
       activeSchedule: {
-        scheduleVersionId: latest.scheduleVersionId,
-        scheduleVersionName: latest.scheduleVersionName,
-        label: latest.scheduleVersionName ?? latest.scheduleVersionId,
+        scheduleVersionId: imported.scheduleVersionId,
+        scheduleVersionName: imported.scheduleVersionName,
+        label: requested.label,
         source: "IMPORTED",
-        importedAt: latest.importedAt,
-        sourceFileName: latest.sourceFileName,
+        importedAt: imported.importedAt,
+        sourceFileName: imported.sourceFileName,
       },
       trains: this.trips
-        .listImportedTrains(latest.scheduleVersionId)
-        .filter((record) => record.data.stations.length > 0)
-        .map((record) => ({
-          ...record.data,
-          scheduleVersionId: record.scheduleVersionId,
-          scheduleVersionName: latest.scheduleVersionName,
+        .list()
+        .filter((trip) => trip.scheduleVersionId === imported.scheduleVersionId)
+        .map((trip) => ({
+          trainNo: trip.trainNo,
+          direction: trip.direction,
+          routeId: trip.routeId,
+          ...(trip.assignedVehicleId
+            ? { vehicleId: trip.assignedVehicleId }
+            : {}),
+          stations:
+            trip.stationTimes && trip.stationTimes.length > 0
+              ? trip.stationTimes
+              : [
+                  {
+                    stationName: trip.originStationId,
+                    departureTime: trip.plannedDepartureAt.slice(11, 19),
+                    order: 0,
+                  },
+                  {
+                    stationName: trip.terminalStationId,
+                    arrivalTime: trip.plannedArrivalAt.slice(11, 19),
+                    order: 1,
+                  },
+                ],
+          scheduleVersionId: trip.scheduleVersionId,
+          scheduleVersionName: imported.scheduleVersionName,
         })),
       duties: this.trips
-        .listImportedDuties(latest.scheduleVersionId)
+        .listImportedDuties(imported.scheduleVersionId)
         .map((record) => record.data),
     };
+  }
+
+  private getFallbackTrains(scheduleVersionId: string): StoredTrain[] {
+    if (normalizeScheduleKey(scheduleVersionId) === "Z6001")
+      return this.createFallbackTrains("Z6001");
+    return this.createFallbackTrains("G6001");
+  }
+
+  private createFallbackTrains(
+    scheduleVersionName: "G6001" | "Z6001",
+  ): StoredTrain[] {
+    return FALLBACK_TRAINS.filter(
+      (train) =>
+        normalizeScheduleKey(train.scheduleVersionName) === scheduleVersionName ||
+        normalizeScheduleKey(train.trainNo) === scheduleVersionName,
+    );
+  }
+
+  private pickOperatingScheduleForDate(now: Date): {
+    scheduleVersionId: "G6001" | "Z6001";
+    label: string;
+    sourceFileName: string;
+  } {
+    const weekday = shanghaiWeekday(now);
+    if (weekday === 0 || weekday === 6) {
+      return {
+        scheduleVersionId: "Z6001",
+        label: "周末 Z6001 时刻表",
+        sourceFileName: "Z6001时刻表.pdf",
+      };
+    }
+    return {
+      scheduleVersionId: "G6001",
+      label: "工作日 G6001 时刻表",
+      sourceFileName: "G6001时刻表.pdf",
+    };
+  }
+
+  private async loadDefaultPdfSchedules(): Promise<void> {
+    for (const [scheduleVersionId, filePath] of Object.entries(
+      DEFAULT_PDF_FILES,
+    ) as Array<["G6001" | "Z6001", string]>) {
+      try {
+        const buffer = await readFile(filePath);
+        const doc = await this.pdfParser.extract(buffer, {
+          fileName: filePath.split("/").at(-1) ?? filePath,
+        });
+        const normalizedDoc: NormalizedImportDocument = {
+          ...doc,
+          meta: {
+            ...doc.meta,
+            scheduleVersionName: scheduleVersionId,
+          },
+          trains: doc.trains.map((train) => ({
+            ...train,
+            routeId: train.routeId ?? scheduleVersionId,
+          })),
+        };
+        this.trips.upsertImportedDocument(
+          `runtime-${scheduleVersionId}`,
+          normalizedDoc,
+          { trains: true, segments: true, duties: true },
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[runtime] failed to load ${filePath}: ${message}`);
+      }
+    }
   }
 }
 
@@ -232,6 +359,9 @@ function calculateTrainPosition(
   LiveTrainDuty,
   | "operatorId"
   | "operatorName"
+  | "dutyRouteNo"
+  | "dutyRouteId"
+  | "dutyShiftName"
   | "trainNo"
   | "routeId"
   | "scheduleVersionId"
@@ -378,13 +508,76 @@ function clockTimeToSeconds(value: string): number {
   return hours * 3600 + minutes * 60 + seconds;
 }
 
+function shanghaiWeekday(date: Date): number {
+  const [year, month, day] = shanghaiLocalDate(date).split("-").map(Number);
+  return new Date(Date.UTC(year ?? 1970, (month ?? 1) - 1, day ?? 1)).getUTCDay();
+}
+
+function shanghaiLocalDate(date: Date): string {
+  const formatter = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = Object.fromEntries(
+    formatter.formatToParts(date).map((part) => [part.type, part.value]),
+  );
+  return `${parts.year ?? "1970"}-${parts.month ?? "01"}-${parts.day ?? "01"}`;
+}
+
+function normalizeScheduleKey(value: string | undefined): string | undefined {
+  return value?.match(/[GZ]6001/i)?.[0].toUpperCase();
+}
+
+function inferDirectionFromStations(
+  stations: StationDoc[],
+): Direction | undefined {
+  if (stations.length < 2) return undefined;
+  const first = stations[0];
+  const last = stations.at(-1);
+  if (!first || !last) return undefined;
+  const firstOrder = stationOrder(first.stationName);
+  const lastOrder = stationOrder(last.stationName);
+  if (firstOrder === lastOrder) return undefined;
+  return firstOrder < lastOrder ? "DOWN" : "UP";
+}
+
+function stationOrder(stationName: string): number {
+  const knownIndex = KNOWN_STATION_ORDER.indexOf(
+    stationName as (typeof KNOWN_STATION_ORDER)[number],
+  );
+  return knownIndex >= 0 ? knownIndex : KNOWN_STATION_ORDER.length + 1;
+}
+
+const KNOWN_STATION_ORDER = [
+  "徐州东站",
+  "大湖站",
+  "赵武站",
+  "博览中心站",
+  "奥体中心站",
+  "一中南站",
+  "市行政中心站",
+  "丽水路站",
+  "迎宾大道站",
+  "市中医院站",
+  "塘坊站",
+  "检测园站",
+  "驿城站",
+  "高家营站",
+  "玉泉河站",
+  "铜山中医院站",
+] as const;
+
 function findMatchingDuty(
   duties: DutyDoc[],
   train: StoredTrain,
 ): DutyDoc | undefined {
+  const trainNo = normalizeTrainNo(train.trainNo);
   return duties.find(
     (duty) =>
-      duty.trainNo === train.trainNo ||
+      normalizeTrainNo(duty.trainNo) === trainNo ||
+      (trainNo !== undefined && extractTrainNos(duty.notes).includes(trainNo)) ||
       (train.routeId !== undefined && duty.routeId === train.routeId),
   );
 }
@@ -392,8 +585,16 @@ function findMatchingDuty(
 function operatorForDuty(
   duty: DutyDoc | undefined,
   fallbackIndex: number,
+  hasImportedDutyAssignments: boolean,
+  trainNo: string,
 ): { operatorId: string; operatorName: string } {
   if (!duty?.operatorName) {
+    if (hasImportedDutyAssignments) {
+      return {
+        operatorId: `unassigned-${trainNo}`,
+        operatorName: "未分配",
+      };
+    }
     const fallback = DEMO_OPERATORS[fallbackIndex % DEMO_OPERATORS.length]!;
     return {
       operatorId: fallback.operatorId,
@@ -411,6 +612,27 @@ function operatorForDuty(
   };
 }
 
+function routeForDuty(
+  duty: DutyDoc | undefined,
+  train: StoredTrain,
+): {
+  routeNo?: string | undefined;
+  routeId?: string | undefined;
+  shiftName?: string | undefined;
+} {
+  const routeNo = noteValue(duty?.notes, "交路号");
+  const shiftName = noteValue(duty?.notes, "班次");
+  return {
+    routeNo: routeNo ?? duty?.routeId ?? train.routeId,
+    routeId: duty?.routeId ?? train.routeId,
+    shiftName,
+  };
+}
+
+function noteValue(notes: string | undefined, key: string): string | undefined {
+  return notes?.match(new RegExp(`${key}:([^；]+)`))?.[1];
+}
+
 function shortHash(value: string): string {
   let hash = 2166136261;
   for (let i = 0; i < value.length; i += 1) {
@@ -418,4 +640,15 @@ function shortHash(value: string): string {
     hash = Math.imul(hash, 16777619);
   }
   return (hash >>> 0).toString(36);
+}
+
+function extractTrainNos(value: string | undefined): string[] {
+  if (!value) return [];
+  return Array.from(
+    new Set((value.match(/\d{5}/g) ?? []).map((trainNo) => trainNo.trim())),
+  );
+}
+
+function normalizeTrainNo(value: string | undefined): string | undefined {
+  return value?.match(/\d{5}/)?.[0];
 }

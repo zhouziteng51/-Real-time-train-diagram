@@ -8,7 +8,11 @@ import "./index.css";
 
 const qc = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 10_000, refetchOnWindowFocus: false },
+    queries: {
+      staleTime: 10_000,
+      refetchOnWindowFocus: false,
+      networkMode: "always",
+    },
   },
 });
 

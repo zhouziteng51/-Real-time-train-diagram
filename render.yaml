@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: metro-ops-backend
+    runtime: node
+    plan: free
+    buildCommand: cd metro-ops && pnpm install --frozen-lockfile && pnpm --filter @metro-ops/shared build && pnpm --filter @metro-ops/backend build
+    startCommand: cd metro-ops && pnpm --filter @metro-ops/backend start
+    healthCheckPath: /api/ops/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: PNPM_VERSION
+        value: 9.0.0

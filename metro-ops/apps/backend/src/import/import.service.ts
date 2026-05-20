@@ -48,13 +48,62 @@ export class ImportDomainService {
     doc: NormalizedImportDocument,
     body: ConfirmImportBody,
   ): void {
+    const normalizedDoc = normalizeDocumentForImport(doc, body);
     const result = this.trips.upsertImportedDocument(
       jobId,
-      doc,
+      normalizedDoc,
       body.acceptedSections,
+      {
+        preserveScheduleVersionMetadata:
+          body.acceptedSections.duties &&
+          !body.acceptedSections.trains &&
+          !body.acceptedSections.segments,
+        replaceDutyDate: body.dutyDate,
+        replaceDutyShiftNames: extractShiftNames(normalizedDoc),
+      },
     );
     this.logger.log(
       `imported schedule ${result.scheduleVersionId}: ${result.trains} trains, ${result.segments} segments, ${result.duties} duties, ${result.projectedTrips} trips`,
     );
   }
+}
+
+function normalizeDocumentForImport(
+  doc: NormalizedImportDocument,
+  body: ConfirmImportBody,
+): NormalizedImportDocument {
+  return {
+    ...doc,
+    meta: {
+      ...doc.meta,
+      scheduleVersionName:
+        body.targetScheduleVersionName ?? doc.meta.scheduleVersionName,
+    },
+    dutyAssignments: doc.dutyAssignments.map((duty) => ({
+      ...duty,
+      ...(body.dutyDate ? { dutyDate: body.dutyDate } : {}),
+      routeId: body.targetScheduleVersionName
+        ? normalizeDutyRouteId(duty, body.targetScheduleVersionName)
+        : duty.routeId,
+    })),
+  };
+}
+
+function normalizeDutyRouteId(
+  duty: NormalizedImportDocument["dutyAssignments"][number],
+  targetScheduleVersionName: string,
+): string | undefined {
+  const routeNo = duty.notes?.match(/交路号:([^；]+)/)?.[1];
+  if (routeNo) return `${targetScheduleVersionName}-${routeNo}`;
+  return duty.routeId;
+}
+
+function extractShiftNames(doc: NormalizedImportDocument): string[] {
+  return Array.from(
+    new Set(
+      doc.dutyAssignments
+        .map((duty) => duty.notes?.match(/班次:([^；]+)/)?.[1])
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
 }

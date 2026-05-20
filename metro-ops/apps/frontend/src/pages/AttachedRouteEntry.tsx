@@ -2,29 +2,25 @@ import { useQuery } from "@tanstack/react-query";
 import { Navigate } from "react-router-dom";
 import type { TripTask } from "@metro-ops/shared";
 import { apiFetch } from "../api/client.js";
+import {
+  findDutyForOperator,
+  findTripForDuty,
+  findTripForOperator,
+  importedTripIdForDuty,
+  type CurrentDutiesResponse,
+} from "../runtime/duties.js";
+import type { OperatorContext } from "@metro-ops/shared";
 
-interface CurrentTimeResponse {
-  iso: string;
-  timeZone: "Asia/Shanghai";
-  localDate: string;
-  localTime: string;
-}
-
-interface ActiveOperatingSchedule {
-  scheduleVersionId: string;
-  scheduleVersionName?: string | undefined;
-  label: string;
-  source: "IMPORTED" | "FALLBACK";
-  importedAt?: string | undefined;
-  sourceFileName?: string | undefined;
-}
-
-interface CurrentDutiesResponse {
-  currentTime: CurrentTimeResponse;
-  activeSchedule: ActiveOperatingSchedule;
+interface TripDetailResponse {
+  trip: TripTask;
 }
 
 export function AttachedRouteEntry() {
+  const operator = useQuery({
+    queryKey: ["operators", "me"],
+    queryFn: () => apiFetch<OperatorContext>("/api/operators/me"),
+  });
+
   const activeTrips = useQuery({
     queryKey: ["trips", "active"],
     queryFn: () => apiFetch<TripTask[]>("/api/trips/active"),
@@ -35,8 +31,20 @@ export function AttachedRouteEntry() {
     queryFn: () => apiFetch<CurrentDutiesResponse>("/api/runtime/duties"),
   });
 
-  const firstTrip = activeTrips.data?.[0];
+  const currentDuty = findDutyForOperator(runtime.data?.duties ?? [], operator.data);
+  const dutyTrip = findTripForDuty(activeTrips.data ?? [], currentDuty);
+  const assignedTrip = findTripForOperator(activeTrips.data ?? [], operator.data);
   const fallbackVersionId = runtime.data?.activeSchedule.scheduleVersionId;
+  const fallbackTripId = currentDuty
+    ? importedTripIdForDuty(currentDuty)
+    : undefined;
+
+  const dutyTripDetail = useQuery({
+    queryKey: ["trip", fallbackTripId, "entry"],
+    queryFn: () => apiFetch<TripDetailResponse>(`/api/trips/${fallbackTripId}`),
+    enabled: !dutyTrip && !!fallbackTripId,
+    retry: false,
+  });
 
   const fallbackTrip = useQuery({
     queryKey: ["trips", "history", fallbackVersionId, "first"],
@@ -44,16 +52,31 @@ export function AttachedRouteEntry() {
       apiFetch<TripTask[]>(
         `/api/trips/history?scheduleVersionId=${encodeURIComponent(fallbackVersionId ?? "")}&limit=1`,
       ),
-    enabled: !firstTrip && !!fallbackVersionId,
+    enabled:
+      !dutyTrip &&
+      !assignedTrip &&
+      (!fallbackTripId || dutyTripDetail.isError) &&
+      !!fallbackVersionId,
   });
 
-  const tripId = firstTrip?.id ?? fallbackTrip.data?.[0]?.id;
+  const tripId =
+    dutyTrip?.id ??
+    dutyTripDetail.data?.trip.id ??
+    assignedTrip?.id ??
+    activeTrips.data?.[0]?.id ??
+    fallbackTrip.data?.[0]?.id;
 
   if (tripId) {
     return <Navigate to={`/attached-route/${tripId}`} replace />;
   }
 
-  if (activeTrips.isLoading || runtime.isLoading || fallbackTrip.isLoading) {
+  if (
+    operator.isLoading ||
+    activeTrips.isLoading ||
+    runtime.isLoading ||
+    dutyTripDetail.isLoading ||
+    fallbackTrip.isLoading
+  ) {
     return (
       <div className="p-margin-mobile md:p-lg text-sm text-on-surface-variant">
         加载中...

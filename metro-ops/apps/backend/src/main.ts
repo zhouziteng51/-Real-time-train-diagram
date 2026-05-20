@@ -1,6 +1,9 @@
 import "reflect-metadata";
+import { loadEnvFiles } from "./config/load-env.js";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module.js";
+
+loadEnvFiles();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { cors: true });

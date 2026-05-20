@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable, OnModuleInit, Optional } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import type {
   ConfirmImportBody,
@@ -10,6 +10,7 @@ import type {
   TripTask,
 } from "@metro-ops/shared";
 import { nextTripStatus } from "@metro-ops/shared";
+import { PostgresService } from "../persistence/postgres.service.js";
 
 export interface TransitionInput {
   tripId: string;
@@ -32,6 +33,10 @@ interface StoredImportRecord<T> {
   data: T;
 }
 
+export interface StoredTripTask extends TripTask {
+  stationTimes?: ImportTrain["stations"] | undefined;
+}
+
 export interface StoredScheduleVersion {
   scheduleVersionId: string;
   scheduleVersionName?: string | undefined;
@@ -50,11 +55,17 @@ interface ImportResult {
   projectedTrips: number;
 }
 
+interface UpsertImportedDocumentOptions {
+  preserveScheduleVersionMetadata?: boolean;
+  replaceDutyDate?: string | undefined;
+  replaceDutyShiftNames?: string[] | undefined;
+}
+
 export const FALLBACK_SCHEDULE_VERSION_ID = "demo-fallback";
 
 @Injectable()
-export class TripStore {
-  private readonly trips = new Map<string, TripTask>();
+export class TripStore implements OnModuleInit {
+  private readonly trips = new Map<string, StoredTripTask>();
   private readonly events: TripEvent[] = [];
   private readonly demoTripIds = new Set<string>();
   private readonly importedTripIdsByVersion = new Map<string, Set<string>>();
@@ -73,15 +84,24 @@ export class TripStore {
   private readonly importedVersions = new Map<string, StoredScheduleVersion>();
   private latestImportedScheduleVersionId: string | undefined;
 
-  constructor() {
+  constructor(
+    @Optional()
+    @Inject(PostgresService)
+    private readonly postgres?: PostgresService,
+  ) {
     this.seed();
   }
 
-  list(): TripTask[] {
+  async onModuleInit(): Promise<void> {
+    if (!this.postgres?.isEnabled()) return;
+    await this.restoreFromPostgres();
+  }
+
+  list(): StoredTripTask[] {
     return Array.from(this.trips.values()).sort(compareTripsByPlannedDeparture);
   }
 
-  active(): TripTask[] {
+  active(): StoredTripTask[] {
     return this.getOperationalTrips().filter(
       (t) =>
         t.status === "PLANNED" ||
@@ -90,18 +110,18 @@ export class TripStore {
     );
   }
 
-  mustFind(id: string): TripTask {
+  mustFind(id: string): StoredTripTask {
     const trip = this.trips.get(id);
     if (!trip) throw new Error(`trip not found: ${id}`);
     return trip;
   }
 
-  transition(input: TransitionInput): { trip: TripTask; event: TripEvent } {
+  transition(input: TransitionInput): { trip: StoredTripTask; event: TripEvent } {
     const trip = this.mustFind(input.tripId);
     const toStatus = nextTripStatus(trip.status, input.event);
     const occurredAt = input.occurredAt ?? new Date().toISOString();
 
-    const updated: TripTask = { ...trip, status: toStatus };
+    const updated: StoredTripTask = { ...trip, status: toStatus };
     if (input.event === "START" || input.event === "DEPART_ORIGIN") {
       updated.actualDepartureAt = updated.actualDepartureAt ?? occurredAt;
     }
@@ -122,6 +142,7 @@ export class TripStore {
       payload: input.payload,
     };
     this.events.push(event);
+    void this.persistTransition(updated, event);
 
     return { trip: updated, event };
   }
@@ -137,7 +158,7 @@ export class TripStore {
     scheduleVersionId?: string;
     operatorName?: string;
     date?: string;
-  }): TripTask[] {
+  }): StoredTripTask[] {
     const hasSpecificFilter = Object.values(filter).some(
       (value) => value !== undefined && value !== "",
     );
@@ -169,20 +190,47 @@ export class TripStore {
     jobId: string,
     doc: NormalizedImportDocument,
     acceptedSections: AcceptedImportSections,
+    options: UpsertImportedDocumentOptions = {},
   ): ImportResult {
     const scheduleVersionId = buildScheduleVersionId(doc, jobId);
     const importedAt = new Date().toISOString();
     const scheduleDate = inferScheduleDate(doc) ?? importedAt.slice(0, 10);
-    this.clearImportedVersionRecords(scheduleVersionId);
-    this.importedVersions.set(scheduleVersionId, {
+    this.clearImportedVersionRecords(
       scheduleVersionId,
-      scheduleVersionName: doc.meta.scheduleVersionName,
-      sourceJobId: jobId,
-      sourceFileName: doc.meta.fileName,
-      importedAt,
-      scheduleDate,
       acceptedSections,
-    });
+      options,
+    );
+    const existingVersion = this.importedVersions.get(scheduleVersionId);
+    if (options.preserveScheduleVersionMetadata && existingVersion) {
+      const version: StoredScheduleVersion = {
+        ...existingVersion,
+        acceptedSections: {
+          trains:
+            existingVersion.acceptedSections.trains ||
+            acceptedSections.trains,
+          segments:
+            existingVersion.acceptedSections.segments ||
+            acceptedSections.segments,
+          duties:
+            existingVersion.acceptedSections.duties ||
+            acceptedSections.duties,
+        },
+      };
+      this.importedVersions.set(scheduleVersionId, version);
+      void this.postgres?.upsertScheduleVersion(version);
+    } else {
+      const version: StoredScheduleVersion = {
+        scheduleVersionId,
+        scheduleVersionName: doc.meta.scheduleVersionName,
+        sourceJobId: jobId,
+        sourceFileName: doc.meta.fileName,
+        importedAt,
+        scheduleDate,
+        acceptedSections,
+      };
+      this.importedVersions.set(scheduleVersionId, version);
+      void this.postgres?.upsertScheduleVersion(version);
+    }
     this.latestImportedScheduleVersionId = scheduleVersionId;
 
     let trains = 0;
@@ -206,11 +254,19 @@ export class TripStore {
 
     if (acceptedSections.duties) {
       for (const duty of doc.dutyAssignments) {
-        this.importedDuties.set(importDutyKey(scheduleVersionId, duty), {
+        const dutyId = importDutyKey(scheduleVersionId, duty);
+        this.importedDuties.set(dutyId, {
           sourceJobId: jobId,
           scheduleVersionId,
           importedAt,
           data: duty,
+        });
+        void this.postgres?.upsertDuty({
+          id: dutyId,
+          sourceJobId: jobId,
+          scheduleVersionId,
+          importedAt,
+          duty,
         });
         duties += 1;
       }
@@ -262,19 +318,46 @@ export class TripStore {
     );
   }
 
-  private clearImportedVersionRecords(scheduleVersionId: string): void {
-    deleteMatchingRecords(this.importedTrains, scheduleVersionId);
-    deleteMatchingRecords(this.importedSegments, scheduleVersionId);
-    deleteMatchingRecords(this.importedDuties, scheduleVersionId);
+  getImportedScheduleVersion(
+    scheduleVersionName: string,
+  ): StoredScheduleVersion | undefined {
+    const normalized = normalizeScheduleKey(scheduleVersionName);
+    return this.listImportedScheduleVersions().find(
+      (version) =>
+        normalizeScheduleKey(version.scheduleVersionName) === normalized ||
+        normalizeScheduleKey(version.scheduleVersionId) === normalized ||
+        normalizeScheduleKey(version.sourceFileName) === normalized,
+    );
   }
 
-  private getOperationalTrips(): TripTask[] {
+  private clearImportedVersionRecords(
+    scheduleVersionId: string,
+    acceptedSections: AcceptedImportSections,
+    options: UpsertImportedDocumentOptions,
+  ): void {
+    if (acceptedSections.trains)
+      deleteMatchingRecords(this.importedTrains, scheduleVersionId);
+    if (acceptedSections.segments)
+      deleteMatchingRecords(this.importedSegments, scheduleVersionId);
+    if (acceptedSections.duties) {
+      deleteMatchingDutyRecords(
+        this.importedDuties,
+        scheduleVersionId,
+        options.replaceDutyDate,
+        options.replaceDutyShiftNames,
+      );
+    }
+  }
+
+  private getOperationalTrips(): StoredTripTask[] {
     const latest = this.getLatestImportedScheduleVersion();
     if (!latest) return this.listDemoTrips();
     return this.listImportedTripsForVersion(latest.scheduleVersionId);
   }
 
-  private getHistoryCandidateTrips(scheduleVersionId?: string): TripTask[] {
+  private getHistoryCandidateTrips(
+    scheduleVersionId?: string,
+  ): StoredTripTask[] {
     if (scheduleVersionId) {
       return this.listTripsForScheduleVersion(scheduleVersionId);
     }
@@ -282,7 +365,9 @@ export class TripStore {
     return this.getOperationalTrips();
   }
 
-  private listTripsForScheduleVersion(scheduleVersionId: string): TripTask[] {
+  private listTripsForScheduleVersion(
+    scheduleVersionId: string,
+  ): StoredTripTask[] {
     if (this.importedVersions.has(scheduleVersionId)) {
       return this.listImportedTripsForVersion(scheduleVersionId);
     }
@@ -294,20 +379,22 @@ export class TripStore {
     );
   }
 
-  private listImportedTripsForVersion(scheduleVersionId: string): TripTask[] {
+  private listImportedTripsForVersion(
+    scheduleVersionId: string,
+  ): StoredTripTask[] {
     const ids = this.importedTripIdsByVersion.get(scheduleVersionId);
     if (!ids) return [];
 
     return this.list().filter((trip) => ids.has(trip.id));
   }
 
-  private listDemoTrips(): TripTask[] {
+  private listDemoTrips(): StoredTripTask[] {
     return this.list().filter((trip) => this.demoTripIds.has(trip.id));
   }
 
   private seed() {
     const today = new Date().toISOString().slice(0, 10);
-    const trips: TripTask[] = [
+    const trips: StoredTripTask[] = [
       {
         id: "trip-demo-1",
         trainNo: "G6001",
@@ -366,7 +453,7 @@ export class TripStore {
       const trip = this.projectTrip(record);
       const existing = this.trips.get(trip.id);
       nextTripIds.add(trip.id);
-      this.trips.set(trip.id, {
+      const nextTrip = {
         ...trip,
         ...(existing
           ? {
@@ -379,7 +466,9 @@ export class TripStore {
                 : {}),
             }
           : {}),
-      });
+      };
+      this.trips.set(trip.id, nextTrip);
+      void this.postgres?.upsertTrip(nextTrip);
       projected += 1;
     }
 
@@ -391,7 +480,7 @@ export class TripStore {
     return projected;
   }
 
-  private projectTrip(record: StoredImportRecord<ImportTrain>): TripTask {
+  private projectTrip(record: StoredImportRecord<ImportTrain>): StoredTripTask {
     const train = record.data;
     const matchingSegments = this.listImportedSegments(
       record.scheduleVersionId,
@@ -438,6 +527,10 @@ export class TripStore {
       trainNo: train.trainNo,
       routeId,
       direction:
+        inferDirectionFromStationNames(
+          firstStation?.stationName ?? segment?.fromStationName,
+          lastStation?.stationName ?? segment?.toStationName,
+        ) ??
         train.direction ??
         segment?.direction ??
         inferDirectionFromTrainNo(train.trainNo),
@@ -453,13 +546,14 @@ export class TripStore {
       assignedOperatorIds: uniqueStrings(
         duties.map((duty) => operatorIdForName(duty.data.operatorName)),
       ),
+      stationTimes: stations,
       ...(train.vehicleId ? { assignedVehicleId: train.vehicleId } : {}),
       status: "PLANNED",
     };
   }
 
   private tripMatchesOperatorName(
-    trip: TripTask,
+    trip: StoredTripTask,
     operatorName: string,
   ): boolean {
     return this.listImportedDuties(trip.scheduleVersionId).some((record) => {
@@ -470,9 +564,95 @@ export class TripStore {
       );
     });
   }
+
+  private async restoreFromPostgres(): Promise<void> {
+    const [versions, duties, trips, events] = await Promise.all([
+      this.postgres?.loadScheduleVersions() ?? [],
+      this.postgres?.loadDuties() ?? [],
+      this.postgres?.loadTrips() ?? [],
+      this.postgres?.loadTripEvents() ?? [],
+    ]);
+
+    for (const version of versions) {
+      this.importedVersions.set(version.scheduleVersionId, version);
+      if (
+        !this.latestImportedScheduleVersionId ||
+        version.importedAt >
+          (this.importedVersions.get(this.latestImportedScheduleVersionId)
+            ?.importedAt ?? "")
+      ) {
+        this.latestImportedScheduleVersionId = version.scheduleVersionId;
+      }
+    }
+
+    for (const duty of duties) {
+      this.importedDuties.set(duty.id, {
+        sourceJobId: duty.sourceJobId,
+        scheduleVersionId: duty.scheduleVersionId,
+        importedAt: duty.importedAt,
+        data: duty.duty,
+      });
+    }
+
+    for (const { trip, stationTimes } of trips) {
+      const storedTrip: StoredTripTask = {
+        ...trip,
+        ...(stationTimes.length > 0 ? { stationTimes } : {}),
+      };
+      this.trips.set(storedTrip.id, storedTrip);
+      if (this.importedVersions.has(storedTrip.scheduleVersionId)) {
+        this.restoreImportedTrain(storedTrip, stationTimes);
+        const ids =
+          this.importedTripIdsByVersion.get(storedTrip.scheduleVersionId) ??
+          new Set<string>();
+        ids.add(storedTrip.id);
+        this.importedTripIdsByVersion.set(storedTrip.scheduleVersionId, ids);
+      }
+    }
+
+    this.events.splice(0, this.events.length, ...events);
+  }
+
+  private restoreImportedTrain(
+    trip: StoredTripTask,
+    stationTimes: ImportTrain["stations"],
+  ): void {
+    this.importedTrains.set(importTrainKey(trip.scheduleVersionId, trip), {
+      sourceJobId:
+        this.importedVersions.get(trip.scheduleVersionId)?.sourceJobId ??
+        "postgres",
+      scheduleVersionId: trip.scheduleVersionId,
+      importedAt:
+        this.importedVersions.get(trip.scheduleVersionId)?.importedAt ??
+        new Date().toISOString(),
+      data: {
+        trainNo: trip.trainNo,
+        direction: trip.direction,
+        routeId: trip.routeId,
+        ...(trip.assignedVehicleId
+          ? { vehicleId: trip.assignedVehicleId }
+          : {}),
+        stations:
+          stationTimes.length > 0
+            ? stationTimes
+            : fallbackStationTimesFromTrip(trip),
+      },
+    });
+  }
+
+  private async persistTransition(
+    trip: StoredTripTask,
+    event: TripEvent,
+  ): Promise<void> {
+    await this.postgres?.upsertTrip(trip);
+    await this.postgres?.insertTripEvent(event);
+  }
 }
 
-function compareTripsByPlannedDeparture(a: TripTask, b: TripTask): number {
+function compareTripsByPlannedDeparture(
+  a: StoredTripTask,
+  b: StoredTripTask,
+): number {
   if (a.plannedDepartureAt === b.plannedDepartureAt)
     return a.trainNo.localeCompare(b.trainNo);
   return a.plannedDepartureAt.localeCompare(b.plannedDepartureAt);
@@ -498,6 +678,28 @@ function deleteMatchingRecords<T>(
   }
 }
 
+function deleteMatchingDutyRecords(
+  records: Map<string, StoredImportRecord<ImportDuty>>,
+  scheduleVersionId: string,
+  dutyDate: string | undefined,
+  shiftNames: string[] | undefined,
+): void {
+  const normalizedShifts = new Set(shiftNames?.filter(Boolean));
+  for (const [key, record] of records) {
+    if (record.scheduleVersionId !== scheduleVersionId) continue;
+    if (dutyDate && record.data.dutyDate !== dutyDate) continue;
+    if (normalizedShifts.size > 0) {
+      const shiftName = dutyShiftName(record.data);
+      if (!shiftName || !normalizedShifts.has(shiftName)) continue;
+    }
+    records.delete(key);
+  }
+}
+
+function dutyShiftName(duty: ImportDuty): string | undefined {
+  return duty.notes?.match(/班次:([^；]+)/)?.[1];
+}
+
 function buildScheduleVersionId(
   doc: NormalizedImportDocument,
   jobId: string,
@@ -508,7 +710,10 @@ function buildScheduleVersionId(
   );
 }
 
-function importTrainKey(scheduleVersionId: string, train: ImportTrain): string {
+function importTrainKey(
+  scheduleVersionId: string,
+  train: Pick<ImportTrain, "trainNo">,
+): string {
   return `${scheduleVersionId}:${train.trainNo}`;
 }
 
@@ -551,11 +756,63 @@ function inferScheduleDate(doc: NormalizedImportDocument): string | undefined {
   return doc.dutyAssignments.find((duty) => duty.dutyDate)?.dutyDate;
 }
 
+function fallbackStationTimesFromTrip(trip: StoredTripTask): ImportTrain["stations"] {
+  return [
+    {
+      stationName: trip.originStationId,
+      departureTime: trip.plannedDepartureAt.slice(11, 19),
+      order: 0,
+    },
+    {
+      stationName: trip.terminalStationId,
+      arrivalTime: trip.plannedArrivalAt.slice(11, 19),
+      order: 1,
+    },
+  ];
+}
+
 function inferDirectionFromTrainNo(trainNo: string): Direction {
   const lastDigit = trainNo.match(/\d(?=\D*$)/)?.[0];
   if (!lastDigit) return "UP";
   return Number(lastDigit) % 2 === 0 ? "DOWN" : "UP";
 }
+
+function inferDirectionFromStationNames(
+  fromStationName: string | undefined,
+  toStationName: string | undefined,
+): Direction | undefined {
+  if (!fromStationName || !toStationName) return undefined;
+  const fromOrder = stationOrder(fromStationName);
+  const toOrder = stationOrder(toStationName);
+  if (fromOrder === toOrder) return undefined;
+  return fromOrder < toOrder ? "DOWN" : "UP";
+}
+
+function stationOrder(stationName: string): number {
+  const knownIndex = KNOWN_STATION_ORDER.indexOf(
+    stationName as (typeof KNOWN_STATION_ORDER)[number],
+  );
+  return knownIndex >= 0 ? knownIndex : KNOWN_STATION_ORDER.length + 1;
+}
+
+const KNOWN_STATION_ORDER = [
+  "徐州东站",
+  "大湖站",
+  "赵武站",
+  "博览中心站",
+  "奥体中心站",
+  "一中南站",
+  "市行政中心站",
+  "丽水路站",
+  "迎宾大道站",
+  "市中医院站",
+  "塘坊站",
+  "检测园站",
+  "驿城站",
+  "高家营站",
+  "玉泉河站",
+  "铜山中医院站",
+] as const;
 
 function toIsoDateTime(date: string, value: string | undefined): string {
   const clock = normalizeClock(value) ?? "00:00:00";
@@ -633,6 +890,10 @@ function cleanIdPart(value: string): string {
     .replace(/[^a-zA-Z0-9_-]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 48);
+}
+
+function normalizeScheduleKey(value: string | undefined): string | undefined {
+  return value?.match(/[GZ]6001/i)?.[0].toUpperCase();
 }
 
 function shortHash(value: string): string {

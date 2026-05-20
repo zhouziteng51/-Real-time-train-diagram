@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ["nodejs_22", "pnpm"]
+
+[phases.install]
+cmds = ["cd metro-ops && pnpm install --frozen-lockfile"]
+
+[phases.build]
+cmds = ["cd metro-ops && pnpm --filter @metro-ops/shared build && pnpm --filter @metro-ops/backend build"]
+
+[start]
+cmd = "cd metro-ops && pnpm --filter @metro-ops/backend start"

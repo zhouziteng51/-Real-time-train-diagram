@@ -20,6 +20,10 @@ import { ImportStore } from "./import.store.js";
 import { ParserFactory, detectSourceType } from "./parsers/parser.factory.js";
 import { ImportParseWorker } from "./import.worker.js";
 import { ImportDomainService } from "./import.service.js";
+import { ImportQueueService } from "./import-queue.service.js";
+import { Roles } from "../auth/roles.decorator.js";
+import { CurrentUser } from "../auth/current-user.decorator.js";
+import type { AuthenticatedUser } from "../auth/roles.js";
 
 interface UploadedImportFile {
   originalname: string;
@@ -30,15 +34,17 @@ interface UploadedImportFile {
 export class ImportController {
   constructor(
     @Inject(ImportStore) private readonly store: ImportStore,
-    @Inject(ImportParseWorker) private readonly worker: ImportParseWorker,
+    @Inject(ImportQueueService) private readonly queue: ImportQueueService,
     @Inject(ImportDomainService) private readonly domain: ImportDomainService,
   ) {}
 
   @Post()
+  @Roles("DISPATCHER")
   @HttpCode(201)
   @UseInterceptors(FileInterceptor("file"))
   async upload(
     @UploadedFile() file: UploadedImportFile | undefined,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<ImportJob> {
     if (!file) throw new BadRequestException("file is required");
     const fileName = normalizeUploadedFileName(file.originalname);
@@ -46,24 +52,27 @@ export class ImportController {
     const job = this.store.createJob({
       fileName,
       sourceType,
-      createdBy: "op-001",
+      createdBy: user.id,
       buffer: file.buffer,
     });
-    this.enqueueParse(job.id);
+    this.queue.enqueue(job.id);
     return job;
   }
 
   @Get()
+  @Roles("DISPATCHER")
   list(): ImportJob[] {
     return this.store.list();
   }
 
   @Get(":jobId")
+  @Roles("DISPATCHER")
   get(@Param("jobId") jobId: string): ImportJob {
     return this.store.mustFindJob(jobId);
   }
 
   @Get(":jobId/preview")
+  @Roles("DISPATCHER")
   preview(@Param("jobId") jobId: string): NormalizedImportDocument {
     const doc = this.store.getDoc(jobId);
     if (!doc) throw new BadRequestException("preview not ready yet");
@@ -71,6 +80,7 @@ export class ImportController {
   }
 
   @Post(":jobId/reparse")
+  @Roles("DISPATCHER")
   @HttpCode(202)
   async reparse(@Param("jobId") jobId: string): Promise<{ status: string }> {
     const current = this.store.mustFindJob(jobId);
@@ -79,11 +89,12 @@ export class ImportController {
         "only REVIEW_REQUIRED or FAILED jobs can be reparsed",
       );
     }
-    this.enqueueParse(jobId);
+    this.queue.enqueue(jobId);
     return { status: "QUEUED" };
   }
 
   @Post(":jobId/confirm")
+  @Roles("ADMIN")
   @HttpCode(200)
   async confirm(
     @Param("jobId") jobId: string,
@@ -95,13 +106,6 @@ export class ImportController {
     return this.store.mustFindJob(jobId);
   }
 
-  private enqueueParse(jobId: string): void {
-    queueMicrotask(() => {
-      this.worker.handle(jobId).catch((err) => {
-        console.error(`[import] handler failed for ${jobId}:`, err);
-      });
-    });
-  }
 }
 
 function normalizeUploadedFileName(fileName: string): string {
@@ -116,6 +120,7 @@ function normalizeUploadedFileName(fileName: string): string {
     ImportStore,
     ParserFactory,
     ImportParseWorker,
+    ImportQueueService,
     ImportDomainService,
   ],
   exports: [ImportStore],

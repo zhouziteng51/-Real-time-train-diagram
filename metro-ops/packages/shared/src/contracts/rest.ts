@@ -37,6 +37,8 @@ export const ConfirmImportBodySchema = z.object({
       duties: z.boolean().default(true),
     })
     .default({ trains: true, segments: true, duties: true }),
+  targetScheduleVersionName: z.string().optional(),
+  dutyDate: IsoDateSchema.optional(),
 });
 export type ConfirmImportBody = z.infer<typeof ConfirmImportBodySchema>;
 

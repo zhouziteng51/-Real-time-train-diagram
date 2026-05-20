@@ -651,9 +651,10 @@ function finalizeTrains(trains: TrainDoc[]): TrainDoc[] {
   return trains
     .map((train) => {
       const stations = dedupeAndSortStations(train.stations);
+      const direction = inferDirectionFromStations(stations);
       return {
         ...train,
-        direction: train.direction ?? inferDirectionFromStations(stations),
+        direction: direction ?? train.direction,
         stations,
       };
     })
@@ -698,7 +699,7 @@ function buildCirculationSegments(
 
     const routeId = train.routeId ?? scheduleVersionName;
     const direction =
-      train.direction ?? inferDirectionFromStations(train.stations);
+      inferDirectionFromStations(train.stations) ?? train.direction;
     const key = JSON.stringify([
       routeId,
       firstStation.stationName,

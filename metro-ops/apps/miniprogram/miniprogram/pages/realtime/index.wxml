@@ -1,21 +1,93 @@
 <view class="page">
   <view class="card">
     <view class="row">
-      <view class="title">实时车次</view>
+      <view>
+        <view class="title">实时车次</view>
+        <view class="subtle">{{operatorName}} · {{operatorId}}</view>
+      </view>
       <view class="pill pill-primary">{{connectionLabel}}</view>
+    </view>
+    <view class="meta-grid">
+      <view class="meta-item">
+        <view class="meta-label">当前时间</view>
+        <view class="meta-value">{{runtimeSummary.timeLabel}}</view>
+      </view>
+      <view class="meta-item">
+        <view class="meta-label">今日执行</view>
+        <view class="meta-value">{{runtimeSummary.scheduleLabel}}</view>
+      </view>
+      <view class="meta-item wide">
+        <view class="meta-label">运行图来源</view>
+        <view class="meta-value">{{runtimeSummary.scheduleSourceLabel}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="metrics-grid">
+    <view class="metric-card">
+      <view class="metric-label">当前值乘</view>
+      <view class="metric-value">{{duties.length}}</view>
+    </view>
+    <view class="metric-card">
+      <view class="metric-label">区间运行</view>
+      <view class="metric-value metric-ok">{{runningCount}}</view>
+    </view>
+    <view class="metric-card">
+      <view class="metric-label">停站</view>
+      <view class="metric-value">{{dwellingCount}}</view>
     </view>
   </view>
 
   <view class="card">
-    <block wx:for="{{trips}}" wx:key="id">
-      <navigator url="/pages/trip/index?id={{item.id}}" class="trip-row">
-        <view class="stack">
-          <view class="font-bold">{{item.trainNo}} · {{item.routeId}}</view>
-          <view class="subtle">{{item.originStationId}} → {{item.terminalStationId}}</view>
+    <view class="section-title">当前人员值乘</view>
+    <block wx:for="{{duties}}" wx:key="operatorId">
+      <view class="duty-row {{item.isCurrentDriverDuty ? 'current-duty' : ''}}">
+        <view class="duty-topline">
+          <view class="route-badge">
+            <view class="route-badge-label">交路</view>
+            <view class="route-badge-value">{{item.routeLabel}}</view>
+            <view class="route-badge-shift">{{item.shiftLabel}}</view>
+          </view>
+          <view class="duty-main">
+            <view class="font-bold">{{item.operatorName}}</view>
+            <view class="subtle">人员</view>
+          </view>
+          <view wx:if="{{item.isCurrentDriverDuty}}" class="pill pill-primary">我的班</view>
         </view>
-        <view class="pill {{item.statusClass}}">{{item.statusLabel}}</view>
-      </navigator>
+
+        <view class="duty-grid">
+          <view class="duty-cell">
+            <view class="cell-label">车次</view>
+            <view class="cell-value">{{item.trainNo}}</view>
+            <view class="cell-sub">{{item.routeId}}</view>
+          </view>
+          <view class="duty-cell">
+            <view class="cell-label">上/下行</view>
+            <view class="cell-value">{{item.directionText}}</view>
+          </view>
+          <view class="duty-cell wide">
+            <view class="cell-label">所在位置</view>
+            <view class="cell-value">{{item.location}}</view>
+            <view class="cell-sub">{{item.stationPair}}</view>
+          </view>
+          <view class="duty-cell">
+            <view class="cell-label">实时状态</view>
+            <view class="status-line">
+              <view class="pill pill-green">{{item.runtimeStatusLabel}}</view>
+              <view class="pill pill-amber">{{item.locationKindLabel}}</view>
+            </view>
+          </view>
+          <view class="duty-cell">
+            <view class="cell-label">计划时间</view>
+            <view class="cell-value">{{item.timeRange}}</view>
+          </view>
+          <view class="duty-cell wide">
+            <view class="cell-label">时刻表来源</view>
+            <view class="cell-value">{{item.scheduleSource}}</view>
+          </view>
+        </view>
+      </view>
     </block>
-    <view wx:if="{{trips.length === 0}}" class="subtle">暂无任务</view>
+    <view wx:if="{{duties.length === 0}}" class="subtle">当前时间没有匹配到正在运行的真实车次</view>
   </view>
 </view>

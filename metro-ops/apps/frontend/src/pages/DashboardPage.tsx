@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { Direction, RealtimeVehicleStatus } from "@metro-ops/shared";
+import type { RealtimeVehicleStatus } from "@metro-ops/shared";
 import { apiFetch } from "../api/client.js";
 import { useAppStore } from "../store/index.js";
 import {
@@ -8,55 +8,21 @@ import {
   locationKindLabel,
   realtimeStatusLabel,
 } from "../format/display.js";
-
-type RuntimeLocationKind =
-  | "AT_STATION"
-  | "BETWEEN_STATIONS"
-  | "NOT_STARTED"
-  | "FINISHED";
-
-interface CurrentTimeResponse {
-  iso: string;
-  timeZone: "Asia/Shanghai";
-  localDate: string;
-  localTime: string;
-}
-
-interface LiveTrainDuty {
-  operatorId: string;
-  operatorName: string;
-  trainNo: string;
-  routeId?: string | undefined;
-  scheduleVersionId: string;
-  scheduleVersionName?: string | undefined;
-  direction?: Direction | undefined;
-  location: string;
-  locationKind: RuntimeLocationKind;
-  previousStationName?: string | undefined;
-  nextStationName?: string | undefined;
-  delaySeconds: number;
-  status: Extract<RealtimeVehicleStatus, "RUNNING" | "DWELLING" | "STOPPED">;
-  plannedDepartureTime?: string | undefined;
-  plannedArrivalTime?: string | undefined;
-  calculatedAt: string;
-}
-
-interface ActiveOperatingSchedule {
-  scheduleVersionId: string;
-  scheduleVersionName?: string | undefined;
-  label: string;
-  source: "IMPORTED" | "FALLBACK";
-  importedAt?: string | undefined;
-  sourceFileName?: string | undefined;
-}
-
-interface CurrentDutiesResponse {
-  currentTime: CurrentTimeResponse;
-  activeSchedule: ActiveOperatingSchedule;
-  duties: LiveTrainDuty[];
-}
+import {
+  formatActiveSchedule,
+  formatDutyRoute,
+  formatScheduleSource,
+  formatStationPair,
+  formatTimeRange,
+  type CurrentDutiesResponse,
+  type LiveTrainDuty,
+  type RuntimeLocationKind,
+} from "../runtime/duties.js";
 
 export function DashboardPage() {
+  const [manualRuntime, setManualRuntime] =
+    useState<CurrentDutiesResponse>();
+  const [manualError, setManualError] = useState<Error>();
   const setActiveScheduleVersion = useAppStore(
     (s) => s.setActiveScheduleVersion,
   );
@@ -66,9 +32,35 @@ export function DashboardPage() {
     refetchInterval: 1000,
   });
 
-  const duties = runtime.data?.duties ?? [];
-  const currentTime = runtime.data?.currentTime;
-  const activeSchedule = runtime.data?.activeSchedule;
+  useEffect(() => {
+    let disposed = false;
+    const load = async () => {
+      try {
+        const data = await apiFetch<CurrentDutiesResponse>(
+          "/api/runtime/duties",
+        );
+        if (disposed) return;
+        setManualRuntime(data);
+        setManualError(undefined);
+      } catch (error) {
+        if (disposed) return;
+        setManualError(error instanceof Error ? error : new Error(String(error)));
+      }
+    };
+    void load();
+    const timer = window.setInterval(load, 1000);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const data = runtime.data ?? manualRuntime;
+  const duties = data?.duties ?? [];
+  const currentTime = data?.currentTime;
+  const activeSchedule = data?.activeSchedule;
+  const runtimeError =
+    runtime.error instanceof Error ? runtime.error : manualError;
   const runningCount = duties.filter(
     (duty) => duty.status === "RUNNING",
   ).length;
@@ -115,6 +107,7 @@ export function DashboardPage() {
           <table className="w-full text-sm">
             <thead className="bg-surface-container-low text-left text-[12px] text-on-surface-variant">
               <tr>
+                <th className="p-sm">交路</th>
                 <th className="p-sm">人员</th>
                 <th className="p-sm">车次</th>
                 <th className="p-sm">上/下行</th>
@@ -130,11 +123,11 @@ export function DashboardPage() {
                   key={`${duty.operatorId}-${duty.trainNo}`}
                   className="border-t border-outline-variant"
                 >
+                  <td className="p-sm min-w-[112px]">
+                    <DutyRouteBadge duty={duty} />
+                  </td>
                   <td className="p-sm">
                     <div className="font-semibold">{duty.operatorName}</div>
-                    <div className="text-[11px] text-on-surface-variant font-mono">
-                      {duty.operatorId}
-                    </div>
                   </td>
                   <td className="p-sm">
                     <div className="font-mono font-bold">{duty.trainNo}</div>
@@ -166,17 +159,17 @@ export function DashboardPage() {
                   </td>
                 </tr>
               ))}
-              {runtime.isError && (
+              {(runtime.isError || (!data && manualError)) && (
                 <tr>
-                  <td colSpan={7} className="p-md text-center text-red-700">
-                    实时数据读取失败：{runtime.error.message}
+                  <td colSpan={8} className="p-md text-center text-red-700">
+                    实时数据读取失败：{runtimeError?.message ?? "未知错误"}
                   </td>
                 </tr>
               )}
-              {!runtime.isError && duties.length === 0 && (
+              {!runtime.isError && !manualError && duties.length === 0 && (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="p-md text-center text-on-surface-variant"
                   >
                     当前时间没有匹配到正在运行的真实车次
@@ -252,38 +245,19 @@ function LocationKindChip({ kind }: { kind: RuntimeLocationKind }) {
   );
 }
 
-function formatTimeRange(
-  start: string | undefined,
-  end: string | undefined,
-): string {
-  if (!start && !end) return "--";
-  return `${formatClock(start)} - ${formatClock(end)}`;
-}
-
-function formatClock(value: string | undefined): string {
-  return value ? value.slice(0, 5) : "--";
-}
-
-function formatStationPair(duty: LiveTrainDuty): string {
-  if (duty.locationKind === "AT_STATION") return "列车正在站内";
-  if (duty.previousStationName && duty.nextStationName) {
-    return `${duty.previousStationName} → ${duty.nextStationName}`;
-  }
-  if (duty.nextStationName) return `下一站：${duty.nextStationName}`;
-  if (duty.previousStationName) return `上一站：${duty.previousStationName}`;
-  return "逐站时刻已接入";
-}
-
-function formatActiveSchedule(schedule: ActiveOperatingSchedule): string {
-  const source =
-    schedule.source === "IMPORTED"
-      ? (schedule.sourceFileName ?? "已确认入库")
-      : "无导入兜底";
-  return `${schedule.label}（${schedule.scheduleVersionId} · ${source}）`;
-}
-
-function formatScheduleSource(duty: LiveTrainDuty): string {
-  return duty.scheduleVersionName
-    ? `${duty.scheduleVersionName}（${duty.scheduleVersionId}）`
-    : duty.scheduleVersionId;
+function DutyRouteBadge({ duty }: { duty: LiveTrainDuty }) {
+  return (
+    <div className="inline-flex flex-col gap-[2px] rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-1 shadow-sm">
+      <span className="inline-flex items-center gap-xs text-[10px] font-semibold text-cyan-700">
+        <span className="h-2 w-2 rounded-full bg-cyan-600" />
+        交路
+      </span>
+      <span className="font-mono text-[15px] font-bold leading-tight text-cyan-950">
+        {formatDutyRoute(duty)}
+      </span>
+      <span className="text-[11px] leading-tight text-cyan-700">
+        {duty.dutyShiftName ?? "未识别班次"}
+      </span>
+    </div>
+  );
 }

@@ -7,22 +7,60 @@
       </view>
       <view class="pill pill-primary">{{connectionLabel}}</view>
     </view>
-  </view>
-
-  <view wx:if="{{trip}}" class="card">
-    <view class="row">
-      <view class="stack">
-        <view class="pill {{statusClass}}">{{tripStatus}}</view>
-        <view class="title">{{trip.trainNo}} · {{trip.routeId}}</view>
-        <view class="subtle">{{trip.originStationId}} → {{trip.terminalStationId}}</view>
+    <view class="meta-grid">
+      <view class="meta-item">
+        <view class="meta-label">当前时间</view>
+        <view class="meta-value">{{runtimeSummary.timeLabel}}</view>
       </view>
-      <view class="stack" style="text-align:right;">
-        <view class="subtle">计划发车</view>
-        <view>{{departureTime}}</view>
-        <view class="subtle">计划到达</view>
-        <view>{{arrivalTime}}</view>
+      <view class="meta-item">
+        <view class="meta-label">今日执行</view>
+        <view class="meta-value">{{runtimeSummary.scheduleLabel}}</view>
+      </view>
+      <view class="meta-item wide">
+        <view class="meta-label">运行图来源</view>
+        <view class="meta-value">{{runtimeSummary.scheduleSourceLabel}}</view>
       </view>
     </view>
+  </view>
+
+  <view wx:if="{{trip}}" class="card task-card">
+    <view class="row task-header">
+      <view class="stack">
+        <view class="status-line">
+          <view class="pill {{statusClass}}">{{tripStatus}}</view>
+          <view wx:if="{{currentDuty}}" class="pill pill-green">{{runtimeStatus}}</view>
+          <view wx:if="{{currentDuty}}" class="pill pill-amber">{{locationKind}}</view>
+        </view>
+        <view class="title">{{trip.trainNo}} · {{trip.routeId}}</view>
+        <view class="subtle">{{trip.originStationId}} → {{trip.terminalStationId}}</view>
+        <view wx:if="{{currentDuty}}" class="subtle">今日值乘 · {{currentDuty.operatorName}}</view>
+      </view>
+    </view>
+
+    <view class="location-panel">
+      <view class="subtle">当前位置</view>
+      <view class="location-text">{{locationText}}</view>
+      <view class="subtle">{{locationHint}}</view>
+    </view>
+
+    <view class="info-grid">
+      <view class="info-cell">
+        <view class="subtle">方向</view>
+        <view>{{directionText}}</view>
+      </view>
+      <view class="info-cell">
+        <view class="subtle">计划时间</view>
+        <view>{{dutyTimeRange}}</view>
+      </view>
+      <view class="info-cell wide">
+        <view class="subtle">运行图来源</view>
+        <view>{{scheduleSource}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{!trip}}" class="card">
+    <view class="subtle">暂无匹配到的值乘任务</view>
   </view>
 
   <view wx:if="{{trip}}" class="button-row">
@@ -41,8 +79,14 @@
         <view class="stack">
           <view class="font-bold">{{item.trainNo}} · {{item.routeId}}</view>
           <view class="subtle">{{item.originStationId}} → {{item.terminalStationId}}</view>
+          <view class="subtle">{{item.directionText}} · {{item.dutyTimeRange}}</view>
+          <view wx:if="{{item.dutyLocation}}" class="subtle">{{item.dutyLocationKind}} · {{item.dutyLocation}}</view>
+          <view wx:if="{{item.isCurrentDriverTrip}}" class="subtle">我的当前班</view>
         </view>
-        <view class="pill {{item.statusClass}}">{{item.statusLabel}}</view>
+        <view class="stack align-right">
+          <view class="pill {{item.statusClass}}">{{item.statusLabel}}</view>
+          <view wx:if="{{item.duty}}" class="pill pill-green">{{item.dutyStatusLabel}}</view>
+        </view>
       </navigator>
     </block>
     <view wx:if="{{activeTrips.length === 0}}" class="subtle">暂无任务</view>

@@ -7,6 +7,7 @@ import { AttachedRoutePage } from "./pages/AttachedRoutePage.js";
 import { MasterSchedulePage } from "./pages/MasterSchedulePage.js";
 import { HistoryTripsPage } from "./pages/HistoryTripsPage.js";
 import { ImportCenterPage } from "./pages/ImportCenterPage.js";
+import { DailyRosterImportPage } from "./pages/DailyRosterImportPage.js";
 
 export const router: ReturnType<typeof createBrowserRouter> = createBrowserRouter([
   {
@@ -18,6 +19,7 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
       { path: "attached-route", element: <AttachedRouteEntry /> },
       { path: "attached-route/:tripId", element: <AttachedRoutePage /> },
       { path: "master-schedule", element: <MasterSchedulePage /> },
+      { path: "daily-roster", element: <DailyRosterImportPage /> },
       { path: "history-trips", element: <HistoryTripsPage /> },
       { path: "imports", element: <ImportCenterPage /> },
       { path: "imports/:jobId", element: <ImportCenterPage /> },

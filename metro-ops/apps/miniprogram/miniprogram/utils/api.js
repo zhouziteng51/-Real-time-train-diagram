@@ -7,6 +7,7 @@ function apiRequest(url, options = {}) {
       url: buildUrl(url),
       header: {
         "content-type": "application/json",
+        ...defaultAuthHeaders(),
         ...header,
       },
       data: body,
@@ -39,6 +40,16 @@ function randomIdempotencyKey() {
   return `wx-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function defaultAuthHeaders() {
+  const { operatorId, operatorName, operatorRole } = app.globalData || {};
+  const headers = {
+    "x-user-role": operatorRole || "DRIVER",
+  };
+  if (operatorId) headers["x-user-id"] = operatorId;
+  if (operatorName) headers["x-user-name"] = operatorName;
+  return headers;
+}
+
 function formatError(status, data) {
   if (typeof data === "string" && data) return `${status}: ${data}`;
   return `${status}`;
@@ -48,5 +59,6 @@ module.exports = {
   apiRequest,
   buildUrl,
   buildWsUrl,
+  defaultAuthHeaders,
   randomIdempotencyKey,
 };

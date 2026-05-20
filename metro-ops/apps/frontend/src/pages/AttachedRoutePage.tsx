@@ -7,10 +7,19 @@ import { useAppStore } from "../store/index.js";
 import { goToHistoryFromAttachedRoute } from "../navigation/toHistory.js";
 import {
   directionLabel,
+  locationKindLabel,
+  realtimeStatusLabel,
   tripEventKindLabel,
   tripEventSourceLabel,
   tripStatusLabel,
 } from "../format/display.js";
+import {
+  findDutyForTrip,
+  formatScheduleSource,
+  formatStationPair,
+  formatTimeRange,
+  type CurrentDutiesResponse,
+} from "../runtime/duties.js";
 
 interface TripDetailResponse {
   trip: TripTask;
@@ -41,6 +50,12 @@ export function AttachedRoutePage() {
     queryKey: ["trip", tripId],
     queryFn: () => apiFetch<TripDetailResponse>(`/api/trips/${tripId}`),
     enabled: !!tripId,
+  });
+
+  const runtime = useQuery({
+    queryKey: ["runtime", "duties"],
+    queryFn: () => apiFetch<CurrentDutiesResponse>("/api/runtime/duties"),
+    refetchInterval: 1000,
   });
 
   const applyTripMutationResult = (res: TripMutationResponse) => {
@@ -89,6 +104,7 @@ export function AttachedRoutePage() {
   });
 
   const trip = tripQuery.data?.trip;
+  const currentDuty = findDutyForTrip(runtime.data?.duties ?? [], trip);
 
   if (!tripId) {
     return (
@@ -125,6 +141,48 @@ export function AttachedRoutePage() {
           <span>预计: {trip?.plannedArrivalAt?.slice(11, 16) ?? "--"}</span>
         </div>
       </section>
+
+      {currentDuty ? (
+        <section className="bg-surface rounded-xl shadow-sm border border-outline-variant p-md mb-lg">
+          <div className="flex flex-col gap-sm md:flex-row md:items-start md:justify-between">
+            <div>
+              <h2 className="text-[16px] font-semibold mb-xs">当前值乘</h2>
+              <p className="text-sm text-on-surface-variant">
+                {currentDuty.operatorName} · {currentDuty.trainNo} ·{" "}
+                {currentDuty.routeId ?? "--"}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-xs">
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-700">
+                {realtimeStatusLabel(currentDuty.status)}
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700">
+                {locationKindLabel(currentDuty.locationKind)}
+              </span>
+            </div>
+          </div>
+          <div className="mt-sm grid gap-sm md:grid-cols-2">
+            <InfoCell label="所在位置" value={currentDuty.location} />
+            <InfoCell label="上下行" value={directionLabel(currentDuty.direction)} />
+            <InfoCell
+              label="区间"
+              value={formatStationPair(currentDuty)}
+            />
+            <InfoCell
+              label="计划时间"
+              value={formatTimeRange(
+                currentDuty.plannedDepartureTime,
+                currentDuty.plannedArrivalTime,
+              )}
+            />
+            <InfoCell
+              label="时刻表来源"
+              value={formatScheduleSource(currentDuty)}
+              wide
+            />
+          </div>
+        </section>
+      ) : null}
 
       <section className="flex gap-sm mb-lg">
         <button
@@ -170,6 +228,27 @@ export function AttachedRoutePage() {
           )}
         </ul>
       </section>
+    </div>
+  );
+}
+
+function InfoCell({
+  label,
+  value,
+  wide = false,
+}: {
+  label: string;
+  value: string;
+  wide?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-lg bg-surface-container-low p-sm ${
+        wide ? "md:col-span-2" : ""
+      }`}
+    >
+      <div className="text-[12px] text-on-surface-variant">{label}</div>
+      <div className="mt-xs text-sm font-semibold break-words">{value}</div>
     </div>
   );
 }

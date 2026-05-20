@@ -11,6 +11,8 @@ coverage/
 
 *.log
 
+.netlify/
+
 .env
 .env.*
 !.env.example

@@ -12,12 +12,9 @@ import {
   useImportStore,
   useRealtimeStore,
 } from "../store/index.js";
+import { wsUrl } from "../api/config.js";
+import { getDemoRealtimeVehicles, shouldUseDemoApi } from "../api/demoApi.js";
 import { RafBatcher } from "./batcher.js";
-
-const WS_URL =
-  typeof window === "undefined"
-    ? ""
-    : `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/ws/network`;
 
 interface Props {
   children: ReactNode;
@@ -49,6 +46,7 @@ export function RealtimeProvider({ children }: Props) {
   }, [desiredRooms]);
 
   useEffect(() => {
+    const WS_URL = wsUrl("/ws/network");
     if (!WS_URL) return;
     const batcher = new RafBatcher((items, sentAt) =>
       replaceVehicles(items, sentAt),
@@ -56,7 +54,21 @@ export function RealtimeProvider({ children }: Props) {
     batcherRef.current = batcher;
 
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let demoTimer: ReturnType<typeof setInterval> | undefined;
     let disposed = false;
+
+    if (shouldUseDemoApi()) {
+      setStatus("ONLINE");
+      replaceVehicles(getDemoRealtimeVehicles(), new Date().toISOString());
+      demoTimer = setInterval(() => {
+        replaceVehicles(getDemoRealtimeVehicles(), new Date().toISOString());
+      }, 3000);
+      return () => {
+        disposed = true;
+        if (demoTimer) clearInterval(demoTimer);
+        batcherRef.current = null;
+      };
+    }
 
     const syncRooms = (rooms: Set<string>) => {
       const ws = socketRef.current;
@@ -140,6 +152,7 @@ export function RealtimeProvider({ children }: Props) {
       disposed = true;
       syncRoomsRef.current = () => undefined;
       if (retryTimer) clearTimeout(retryTimer);
+      if (demoTimer) clearInterval(demoTimer);
       joinedRoomsRef.current.clear();
       batcherRef.current = null;
       socketRef.current?.close();

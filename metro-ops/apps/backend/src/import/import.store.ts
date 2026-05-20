@@ -1,8 +1,10 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger, OnModuleInit, Optional } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import type { ImportJob, NormalizedImportDocument } from "@metro-ops/shared";
 import { assertTransitionImport, WS_EVENTS, importJobRoom } from "@metro-ops/shared";
 import { RealtimeGateway } from "../realtime/realtime.gateway.js";
+import { PostgresService } from "../persistence/postgres.service.js";
+import { ObjectStorageService } from "../storage/object-storage.service.js";
 
 export interface StoredFile {
   key: string;
@@ -10,13 +12,29 @@ export interface StoredFile {
 }
 
 @Injectable()
-export class ImportStore {
+export class ImportStore implements OnModuleInit {
   private readonly logger = new Logger(ImportStore.name);
   private readonly jobs = new Map<string, ImportJob>();
   private readonly files = new Map<string, StoredFile>();
   private readonly docs = new Map<string, NormalizedImportDocument>();
 
-  constructor(@Inject(RealtimeGateway) private readonly realtime: RealtimeGateway) {}
+  constructor(
+    @Inject(RealtimeGateway) private readonly realtime: RealtimeGateway,
+    @Inject(ObjectStorageService)
+    private readonly objectStorage: ObjectStorageService,
+    @Optional()
+    @Inject(PostgresService)
+    private readonly postgres?: PostgresService,
+  ) {}
+
+  async onModuleInit(): Promise<void> {
+    if (!this.postgres?.isEnabled()) return;
+    const jobs = await this.postgres.loadImportJobs();
+    for (const job of jobs) this.jobs.set(job.id, job);
+    if (jobs.length > 0) {
+      this.logger.log(`restored ${jobs.length} import jobs from postgres`);
+    }
+  }
 
   createJob(params: {
     fileName: string;
@@ -27,6 +45,7 @@ export class ImportStore {
     const id = randomUUID();
     const key = `uploads/${id}/${params.fileName}`;
     this.files.set(key, { key, buffer: params.buffer });
+    this.objectStorage.write(key, params.buffer);
     const now = new Date().toISOString();
     const job: ImportJob = {
       id,
@@ -42,11 +61,17 @@ export class ImportStore {
       storageKey: key,
     };
     this.jobs.set(id, job);
+    void this.postgres?.upsertImportJob(job);
     this.emit(job);
     return job;
   }
 
   readFile(key: string): Buffer {
+    try {
+      return this.objectStorage.read(key);
+    } catch {
+      // Keep the in-memory fallback for old jobs created before file storage.
+    }
     const f = this.files.get(key);
     if (!f) throw new Error(`file not found: ${key}`);
     return f.buffer;
@@ -71,6 +96,7 @@ export class ImportStore {
     assertTransitionImport(current.status, patch.status);
     const next: ImportJob = { ...current, ...patch, updatedAt: new Date().toISOString() };
     this.jobs.set(jobId, next);
+    void this.postgres?.upsertImportJob(next);
     this.emit(next);
     return next;
   }

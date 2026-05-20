@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { HttpAdapterHost } from "@nestjs/core";
 import { WebSocketServer, WebSocket } from "ws";
 import {
   WsClientMessageSchema,
@@ -14,12 +15,15 @@ export class RealtimeGateway implements OnModuleInit, OnModuleDestroy {
   private wss?: WebSocketServer;
   private readonly rooms = new Map<string, Set<WebSocket>>();
   private readonly clientRooms = new WeakMap<WebSocket, Set<string>>();
+  private onlineClients = 0;
+
+  constructor(private readonly adapterHost: HttpAdapterHost) {}
 
   onModuleInit(): void {
-    const port = Number(process.env.WS_PORT ?? 3001);
-    this.wss = new WebSocketServer({ port, path: WS_PATH });
+    const httpServer = this.adapterHost.httpAdapter.getHttpServer();
+    this.wss = new WebSocketServer({ server: httpServer, path: WS_PATH });
     this.wss.on("connection", (socket) => this.handleConnection(socket));
-    this.logger.log(`WebSocket listening on :${port}${WS_PATH}`);
+    this.logger.log(`WebSocket listening on ${WS_PATH}`);
   }
 
   onModuleDestroy(): void {
@@ -40,6 +44,7 @@ export class RealtimeGateway implements OnModuleInit, OnModuleDestroy {
   }
 
   private handleConnection(socket: WebSocket): void {
+    this.onlineClients += 1;
     this.clientRooms.set(socket, new Set());
     this.joinRoom(socket, globalNetworkRoom());
 
@@ -84,5 +89,20 @@ export class RealtimeGateway implements OnModuleInit, OnModuleDestroy {
     if (!joined) return;
     for (const room of joined) this.rooms.get(room)?.delete(socket);
     this.clientRooms.delete(socket);
+    this.onlineClients = Math.max(0, this.onlineClients - 1);
+  }
+
+  stats(): { onlineClients: number; rooms: Array<{ room: string; clients: number }> } {
+    return {
+      onlineClients: this.onlineClients,
+      rooms: Array.from(this.rooms.entries())
+        .map(([room, clients]) => ({
+          room,
+          clients: Array.from(clients).filter(
+            (client) => client.readyState === WebSocket.OPEN,
+          ).length,
+        }))
+        .sort((a, b) => a.room.localeCompare(b.room)),
+    };
   }
 }

@@ -6,9 +6,23 @@ import { OperatorModule } from "./operator/operator.module.js";
 import { RuntimeScheduleModule } from "./schedule/runtime-schedule.module.js";
 import { IdempotencyInterceptor } from "./common/idempotency.interceptor.js";
 import { APP_INTERCEPTOR } from "@nestjs/core";
+import { AuthModule } from "./auth/auth.module.js";
+import { PersistenceModule } from "./persistence/persistence.module.js";
+import { StorageModule } from "./storage/storage.module.js";
+import { ObservabilityModule } from "./observability/observability.module.js";
 
 @Module({
-  imports: [OperatorModule, TripModule, ImportModule, RealtimeModule, RuntimeScheduleModule],
+  imports: [
+    AuthModule,
+    PersistenceModule,
+    StorageModule,
+    OperatorModule,
+    TripModule,
+    ImportModule,
+    RealtimeModule,
+    RuntimeScheduleModule,
+    ObservabilityModule,
+  ],
   providers: [
     {
       provide: APP_INTERCEPTOR,

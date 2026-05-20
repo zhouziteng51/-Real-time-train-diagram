@@ -2,7 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import type { ImportJob, NormalizedImportDocument } from "@metro-ops/shared";
-import { apiFetch, randomIdempotencyKey } from "../api/client.js";
+import {
+  apiFetch,
+  defaultAuthHeaders,
+  randomIdempotencyKey,
+} from "../api/client.js";
+import { apiUrl } from "../api/config.js";
+import { demoUploadImportFile, shouldUseDemoApi } from "../api/demoApi.js";
 import { useImportStore } from "../store/index.js";
 import {
   confidenceLabel,
@@ -16,6 +22,7 @@ export function ImportCenterPage() {
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [pendingJob, setPendingJob] = useState<ImportJob | null>(null);
+  const [reparsingJobId, setReparsingJobId] = useState<string | null>(null);
   const jobsFromWs = useImportStore((s) => s.jobsById);
   const setCurrentJob = useImportStore((s) => s.setCurrentJob);
 
@@ -48,9 +55,14 @@ export function ImportCenterPage() {
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
+      if (shouldUseDemoApi()) return demoUploadImportFile(file);
       const form = new FormData();
       form.append("file", file);
-      const res = await fetch("/api/imports", { method: "POST", body: form });
+      const res = await fetch(apiUrl("/api/imports"), {
+        method: "POST",
+        body: form,
+        headers: defaultAuthHeaders(),
+      });
       if (!res.ok) throw new Error(await res.text());
       return (await res.json()) as ImportJob;
     },
@@ -67,6 +79,7 @@ export function ImportCenterPage() {
         method: "POST",
         body: {},
         idempotencyKey: randomIdempotencyKey(),
+        headers: defaultAuthHeaders("ADMIN"),
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["imports"] });
@@ -78,8 +91,67 @@ export function ImportCenterPage() {
     },
   });
 
+  const reparseMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ status: string }>(`/api/imports/${id}/reparse`, {
+        method: "POST",
+      }),
+    onMutate: async (id) => {
+      setReparsingJobId(id);
+      await Promise.all([
+        qc.cancelQueries({ queryKey: ["imports", id] }),
+        qc.cancelQueries({ queryKey: ["imports"] }),
+      ]);
+
+      const previousJob = qc.getQueryData<ImportJob>(["imports", id]);
+      const previousJobs = qc.getQueryData<ImportJob[]>(["imports"]);
+      const updatedAt = new Date().toISOString();
+
+      qc.setQueryData<ImportJob>(["imports", id], (current) =>
+        current ? { ...current, status: "PARSING", updatedAt } : current,
+      );
+      qc.setQueryData<ImportJob[]>(["imports"], (current) =>
+        current?.map((item) =>
+          item.id === id ? { ...item, status: "PARSING", updatedAt } : item,
+        ),
+      );
+
+      return { previousJob, previousJobs };
+    },
+    onError: (_error, id, context) => {
+      if (context?.previousJob) {
+        qc.setQueryData(["imports", id], context.previousJob);
+      }
+      if (context?.previousJobs) {
+        qc.setQueryData(["imports"], context.previousJobs);
+      }
+    },
+    onSuccess: (_result, id) => {
+      qc.invalidateQueries({ queryKey: ["imports"] });
+      qc.invalidateQueries({ queryKey: ["imports", id] });
+      qc.invalidateQueries({ queryKey: ["imports", id, "preview"] });
+    },
+    onSettled: (_result, _error, id) => {
+      setReparsingJobId((current) => (current === id ? null : current));
+    },
+  });
+
   const job =
     jobDetail.data ?? (activeJobId ? jobsFromWs[activeJobId] : undefined);
+  const canConfirm =
+    !!job && ["REVIEW_REQUIRED", "NORMALIZED"].includes(job.status);
+  const canReparse =
+    !!job && ["FAILED", "REVIEW_REQUIRED"].includes(job.status);
+  const isReparsingThisJob = !!job && reparsingJobId === job.id;
+  const visiblePreview =
+    job && ["REVIEW_REQUIRED", "NORMALIZED", "IMPORTED"].includes(job.status)
+      ? preview.data
+      : null;
+  const operationError =
+    uploadMutation.error ??
+    reparseMutation.error ??
+    confirmMutation.error ??
+    jobDetail.error;
 
   useEffect(() => {
     setCurrentJob(activeJobId);
@@ -112,6 +184,14 @@ export function ImportCenterPage() {
             e.target.value = "";
           }}
         />
+        {operationError && (
+          <div
+            role="alert"
+            className="mt-sm rounded-lg bg-red-50 p-sm text-sm text-red-700"
+          >
+            操作失败：{operationError.message}
+          </div>
+        )}
       </section>
 
       <section className="grid grid-cols-1 md:grid-cols-3 gap-md">
@@ -187,6 +267,12 @@ export function ImportCenterPage() {
                 )}
               </header>
 
+              {["UPLOADED", "PARSING"].includes(job.status) && (
+                <div className="mb-sm rounded-lg bg-blue-50 p-sm text-sm text-blue-700">
+                  正在解析，页面会自动刷新结果。
+                </div>
+              )}
+
               {(job.warnings.length > 0 || job.errors.length > 0) && (
                 <section className="mb-sm">
                   {job.errors.map((e, i) => (
@@ -202,27 +288,27 @@ export function ImportCenterPage() {
                 </section>
               )}
 
-              {preview.data && (
+              {visiblePreview && (
                 <section className="mb-sm bg-surface-container-low p-sm rounded text-sm">
                   <div className="grid grid-cols-3 gap-sm mb-sm">
                     <PreviewMetric
                       label="车次数"
-                      value={preview.data.trains.length}
+                      value={visiblePreview.trains.length}
                     />
                     <PreviewMetric
                       label="交路数"
-                      value={preview.data.circulationSegments.length}
+                      value={visiblePreview.circulationSegments.length}
                     />
                     <PreviewMetric
                       label="值乘数"
-                      value={preview.data.dutyAssignments.length}
+                      value={visiblePreview.dutyAssignments.length}
                     />
                   </div>
                   <div className="text-[12px] text-on-surface-variant mb-xs">
                     车次预览
                   </div>
                   <ul className="space-y-xs mb-sm">
-                    {preview.data.trains.slice(0, 5).map((train) => (
+                    {visiblePreview.trains.slice(0, 5).map((train) => (
                       <li
                         key={train.trainNo}
                         className="rounded bg-surface px-sm py-xs"
@@ -241,7 +327,7 @@ export function ImportCenterPage() {
                         </div>
                       </li>
                     ))}
-                    {preview.data.trains.length === 0 && (
+                    {visiblePreview.trains.length === 0 && (
                       <li className="rounded bg-surface px-sm py-xs text-on-surface-variant">
                         未识别到可预览车次
                       </li>
@@ -251,7 +337,7 @@ export function ImportCenterPage() {
                     区段预览
                   </div>
                   <ul className="space-y-xs">
-                    {preview.data.circulationSegments
+                    {visiblePreview.circulationSegments
                       .slice(0, 3)
                       .map((segment) => (
                         <li
@@ -275,7 +361,7 @@ export function ImportCenterPage() {
                           </div>
                         </li>
                       ))}
-                    {preview.data.circulationSegments.length === 0 && (
+                    {visiblePreview.circulationSegments.length === 0 && (
                       <li className="rounded bg-surface px-sm py-xs text-on-surface-variant">
                         未识别到可预览区段
                       </li>
@@ -284,11 +370,25 @@ export function ImportCenterPage() {
                 </section>
               )}
 
-              <footer className="flex gap-sm">
+              <footer className="flex flex-col gap-sm sm:flex-row">
+                {(canReparse || isReparsingThisJob) && (
+                  <button
+                    disabled={
+                      isReparsingThisJob ||
+                      confirmMutation.isPending ||
+                      !canReparse
+                    }
+                    onClick={() => reparseMutation.mutate(job.id)}
+                    className="h-touch-target flex-1 rounded-lg border border-outline-variant bg-surface-container-low font-semibold disabled:opacity-50"
+                  >
+                    {isReparsingThisJob ? "重新解析中..." : "重新解析"}
+                  </button>
+                )}
                 <button
                   disabled={
-                    !["REVIEW_REQUIRED", "NORMALIZED"].includes(job.status) ||
-                    confirmMutation.isPending
+                    !canConfirm ||
+                    confirmMutation.isPending ||
+                    reparseMutation.isPending
                   }
                   onClick={() => confirmMutation.mutate(job.id)}
                   className="flex-1 h-touch-target rounded-lg bg-primary text-on-primary font-semibold disabled:opacity-50"
