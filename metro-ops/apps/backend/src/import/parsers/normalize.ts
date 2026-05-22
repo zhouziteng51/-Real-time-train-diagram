@@ -1,6 +1,5 @@
 import type { Direction, NormalizedImportDocument } from "@metro-ops/shared";
 import { inflateRawSync } from "node:zlib";
-import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
 import type { ParserContext, SourceParser } from "./types.js";
 
 type RawBlock = NormalizedImportDocument["rawBlocks"][number];
@@ -8,6 +7,13 @@ type TrainDoc = NormalizedImportDocument["trains"][number];
 type StationDoc = TrainDoc["stations"][number];
 type CirculationSegment =
   NormalizedImportDocument["circulationSegments"][number];
+type PdfJsModule = typeof import("pdfjs-dist/legacy/build/pdf.mjs");
+type PdfJsGlobal = typeof globalThis & {
+  DOMMatrix?: typeof DOMMatrix;
+  DOMPoint?: typeof DOMPoint;
+  ImageData?: typeof ImageData;
+  Path2D?: typeof Path2D;
+};
 
 interface ParsedRow {
   index: number;
@@ -155,6 +161,7 @@ export class PdfOcrHybridParser implements SourceParser {
     const warnings: string[] = [];
     const coordinateTrainMap = new Map<string, TrainDoc>();
     const rawBlocks: RawBlock[] = [];
+    const pdfjs = await loadPdfJs();
     const pdf = await pdfjs.getDocument({
       data: new Uint8Array(buffer),
       useWorkerFetch: false,
@@ -262,6 +269,459 @@ export class PdfOcrHybridParser implements SourceParser {
       warnings: finalWarnings,
     };
   }
+}
+
+async function loadPdfJs(): Promise<PdfJsModule> {
+  installPdfJsGeometryPolyfills();
+  try {
+    return await import("pdfjs-dist/legacy/build/pdf.mjs");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`pdf: parser runtime unavailable: ${message}`);
+  }
+}
+
+function installPdfJsGeometryPolyfills(): void {
+  const target = globalThis as PdfJsGlobal;
+  target.DOMMatrix ??= SimpleDOMMatrix as unknown as typeof DOMMatrix;
+  target.DOMPoint ??= SimpleDOMPoint as unknown as typeof DOMPoint;
+  target.ImageData ??= SimpleImageData as unknown as typeof ImageData;
+  target.Path2D ??= SimplePath2D as unknown as typeof Path2D;
+}
+
+class SimpleDOMPoint {
+  constructor(
+    public x = 0,
+    public y = 0,
+    public z = 0,
+    public w = 1,
+  ) {}
+
+  static fromPoint(point: DOMPointInit = {}): SimpleDOMPoint {
+    return new SimpleDOMPoint(
+      point.x ?? 0,
+      point.y ?? 0,
+      point.z ?? 0,
+      point.w ?? 1,
+    );
+  }
+
+  matrixTransform(matrix: SimpleDOMMatrix): SimpleDOMPoint {
+    return matrix.transformPoint(this);
+  }
+
+  toJSON(): DOMPointInit {
+    return { x: this.x, y: this.y, z: this.z, w: this.w };
+  }
+}
+
+class SimpleDOMMatrix {
+  a = 1;
+  b = 0;
+  c = 0;
+  d = 1;
+  e = 0;
+  f = 0;
+
+  constructor(init?: string | ArrayLike<number> | DOMMatrixInit) {
+    if (init === undefined || init === "") return;
+    if (typeof init === "string") {
+      this.setMatrixValue(init);
+      return;
+    }
+    if (isArrayLikeMatrix(init)) {
+      this.setFromArray(init);
+      return;
+    }
+    this.a = init.a ?? init.m11 ?? this.a;
+    this.b = init.b ?? init.m12 ?? this.b;
+    this.c = init.c ?? init.m21 ?? this.c;
+    this.d = init.d ?? init.m22 ?? this.d;
+    this.e = init.e ?? init.m41 ?? this.e;
+    this.f = init.f ?? init.m42 ?? this.f;
+  }
+
+  get m11(): number {
+    return this.a;
+  }
+  set m11(value: number) {
+    this.a = value;
+  }
+  get m12(): number {
+    return this.b;
+  }
+  set m12(value: number) {
+    this.b = value;
+  }
+  get m13(): number {
+    return 0;
+  }
+  set m13(_value: number) {}
+  get m14(): number {
+    return 0;
+  }
+  set m14(_value: number) {}
+  get m21(): number {
+    return this.c;
+  }
+  set m21(value: number) {
+    this.c = value;
+  }
+  get m22(): number {
+    return this.d;
+  }
+  set m22(value: number) {
+    this.d = value;
+  }
+  get m23(): number {
+    return 0;
+  }
+  set m23(_value: number) {}
+  get m24(): number {
+    return 0;
+  }
+  set m24(_value: number) {}
+  get m31(): number {
+    return 0;
+  }
+  set m31(_value: number) {}
+  get m32(): number {
+    return 0;
+  }
+  set m32(_value: number) {}
+  get m33(): number {
+    return 1;
+  }
+  set m33(_value: number) {}
+  get m34(): number {
+    return 0;
+  }
+  set m34(_value: number) {}
+  get m41(): number {
+    return this.e;
+  }
+  set m41(value: number) {
+    this.e = value;
+  }
+  get m42(): number {
+    return this.f;
+  }
+  set m42(value: number) {
+    this.f = value;
+  }
+  get m43(): number {
+    return 0;
+  }
+  set m43(_value: number) {}
+  get m44(): number {
+    return 1;
+  }
+  set m44(_value: number) {}
+
+  get is2D(): boolean {
+    return true;
+  }
+
+  get isIdentity(): boolean {
+    return (
+      this.a === 1 &&
+      this.b === 0 &&
+      this.c === 0 &&
+      this.d === 1 &&
+      this.e === 0 &&
+      this.f === 0
+    );
+  }
+
+  static fromMatrix(init?: DOMMatrixInit): SimpleDOMMatrix {
+    return new SimpleDOMMatrix(init);
+  }
+
+  static fromFloat32Array(init: Float32Array): SimpleDOMMatrix {
+    return new SimpleDOMMatrix(init);
+  }
+
+  static fromFloat64Array(init: Float64Array): SimpleDOMMatrix {
+    return new SimpleDOMMatrix(init);
+  }
+
+  multiply(other?: DOMMatrixInit): SimpleDOMMatrix {
+    return this.clone().multiplySelf(other);
+  }
+
+  multiplySelf(other?: DOMMatrixInit): this {
+    return this.applyMatrix(new SimpleDOMMatrix(other));
+  }
+
+  preMultiplySelf(other?: DOMMatrixInit): this {
+    return this.setFromMatrix(multiplyMatrices(new SimpleDOMMatrix(other), this));
+  }
+
+  translate(tx = 0, ty = 0): SimpleDOMMatrix {
+    return this.clone().translateSelf(tx, ty);
+  }
+
+  translateSelf(tx = 0, ty = 0): this {
+    return this.multiplySelf({ e: tx, f: ty });
+  }
+
+  scale(scaleX = 1, scaleY = scaleX): SimpleDOMMatrix {
+    return this.clone().scaleSelf(scaleX, scaleY);
+  }
+
+  scaleSelf(
+    scaleX = 1,
+    scaleY = scaleX,
+    _scaleZ = 1,
+    originX = 0,
+    originY = 0,
+  ): this {
+    return this.translateSelf(originX, originY)
+      .multiplySelf({ a: scaleX, d: scaleY })
+      .translateSelf(-originX, -originY);
+  }
+
+  rotate(rotX = 0, rotY?: number, rotZ?: number): SimpleDOMMatrix {
+    return this.clone().rotateSelf(rotX, rotY, rotZ);
+  }
+
+  rotateSelf(rotX = 0, rotY?: number, rotZ?: number): this {
+    const degrees = rotY === undefined && rotZ === undefined ? rotX : (rotZ ?? 0);
+    const radians = (degrees * Math.PI) / 180;
+    const cos = Math.cos(radians);
+    const sin = Math.sin(radians);
+    return this.multiplySelf({ a: cos, b: sin, c: -sin, d: cos });
+  }
+
+  inverse(): SimpleDOMMatrix {
+    return this.clone().invertSelf();
+  }
+
+  invertSelf(): this {
+    const det = this.a * this.d - this.b * this.c;
+    if (det === 0) {
+      this.a = Number.NaN;
+      this.b = Number.NaN;
+      this.c = Number.NaN;
+      this.d = Number.NaN;
+      this.e = Number.NaN;
+      this.f = Number.NaN;
+      return this;
+    }
+
+    return this.setFromMatrix({
+      a: this.d / det,
+      b: -this.b / det,
+      c: -this.c / det,
+      d: this.a / det,
+      e: (this.c * this.f - this.d * this.e) / det,
+      f: (this.b * this.e - this.a * this.f) / det,
+    });
+  }
+
+  setMatrixValue(transformList: string): this {
+    const matrixMatch = transformList.match(/matrix\(([^)]+)\)/);
+    if (!matrixMatch) return this;
+    const values = matrixMatch[1]
+      ?.split(/[,\s]+/)
+      .map(Number)
+      .filter((value) => Number.isFinite(value));
+    if (values?.length === 6) this.setFromArray(values);
+    return this;
+  }
+
+  transformPoint(point: DOMPointInit = {}): SimpleDOMPoint {
+    const x = point.x ?? 0;
+    const y = point.y ?? 0;
+    return new SimpleDOMPoint(
+      x * this.a + y * this.c + this.e,
+      x * this.b + y * this.d + this.f,
+      point.z ?? 0,
+      point.w ?? 1,
+    );
+  }
+
+  toFloat32Array(): Float32Array {
+    return Float32Array.from(this.toFloat64Array());
+  }
+
+  toFloat64Array(): Float64Array {
+    return Float64Array.from([
+      this.a,
+      this.b,
+      0,
+      0,
+      this.c,
+      this.d,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      this.e,
+      this.f,
+      0,
+      1,
+    ]);
+  }
+
+  toJSON(): DOMMatrixInit {
+    return {
+      a: this.a,
+      b: this.b,
+      c: this.c,
+      d: this.d,
+      e: this.e,
+      f: this.f,
+      m11: this.m11,
+      m12: this.m12,
+      m21: this.m21,
+      m22: this.m22,
+      m41: this.m41,
+      m42: this.m42,
+      is2D: this.is2D,
+    };
+  }
+
+  toString(): string {
+    return `matrix(${this.a}, ${this.b}, ${this.c}, ${this.d}, ${this.e}, ${this.f})`;
+  }
+
+  private clone(): SimpleDOMMatrix {
+    return new SimpleDOMMatrix(this);
+  }
+
+  private applyMatrix(other: SimpleDOMMatrix): this {
+    return this.setFromMatrix(multiplyMatrices(this, other));
+  }
+
+  private setFromArray(values: ArrayLike<number>): this {
+    if (values.length === 6) {
+      this.a = Number(values[0]);
+      this.b = Number(values[1]);
+      this.c = Number(values[2]);
+      this.d = Number(values[3]);
+      this.e = Number(values[4]);
+      this.f = Number(values[5]);
+      return this;
+    }
+    if (values.length === 16) {
+      this.a = Number(values[0]);
+      this.b = Number(values[1]);
+      this.c = Number(values[4]);
+      this.d = Number(values[5]);
+      this.e = Number(values[12]);
+      this.f = Number(values[13]);
+    }
+    return this;
+  }
+
+  private setFromMatrix(matrix: DOMMatrixInit): this {
+    this.a = matrix.a ?? matrix.m11 ?? this.a;
+    this.b = matrix.b ?? matrix.m12 ?? this.b;
+    this.c = matrix.c ?? matrix.m21 ?? this.c;
+    this.d = matrix.d ?? matrix.m22 ?? this.d;
+    this.e = matrix.e ?? matrix.m41 ?? this.e;
+    this.f = matrix.f ?? matrix.m42 ?? this.f;
+    return this;
+  }
+}
+
+class SimpleImageData {
+  readonly data: Uint8ClampedArray;
+  readonly colorSpace = "srgb";
+
+  constructor(dataOrWidth: Uint8ClampedArray | number, width?: number, height?: number) {
+    if (typeof dataOrWidth === "number") {
+      this.width = dataOrWidth;
+      this.height = width ?? 0;
+      this.data = new Uint8ClampedArray(this.width * this.height * 4);
+      return;
+    }
+    this.data = dataOrWidth;
+    this.width = width ?? 0;
+    this.height = height ?? Math.floor(this.data.length / 4 / Math.max(this.width, 1));
+  }
+
+  readonly width: number;
+  readonly height: number;
+}
+
+class SimplePath2D {
+  constructor(_path?: Path2D | string) {}
+  addPath(_path: Path2D, _transform?: DOMMatrix2DInit): void {}
+  closePath(): void {}
+  moveTo(_x: number, _y: number): void {}
+  lineTo(_x: number, _y: number): void {}
+  bezierCurveTo(
+    _cp1x: number,
+    _cp1y: number,
+    _cp2x: number,
+    _cp2y: number,
+    _x: number,
+    _y: number,
+  ): void {}
+  quadraticCurveTo(_cpx: number, _cpy: number, _x: number, _y: number): void {}
+  arc(
+    _x: number,
+    _y: number,
+    _radius: number,
+    _startAngle: number,
+    _endAngle: number,
+    _counterclockwise?: boolean,
+  ): void {}
+  arcTo(
+    _x1: number,
+    _y1: number,
+    _x2: number,
+    _y2: number,
+    _radius: number,
+  ): void {}
+  ellipse(
+    _x: number,
+    _y: number,
+    _radiusX: number,
+    _radiusY: number,
+    _rotation: number,
+    _startAngle: number,
+    _endAngle: number,
+    _counterclockwise?: boolean,
+  ): void {}
+  rect(_x: number, _y: number, _w: number, _h: number): void {}
+}
+
+function isArrayLikeMatrix(
+  value: string | ArrayLike<number> | DOMMatrixInit,
+): value is ArrayLike<number> {
+  return typeof value !== "string" && "length" in value;
+}
+
+function multiplyMatrices(
+  left: DOMMatrixInit,
+  right: DOMMatrixInit,
+): DOMMatrixInit {
+  const la = left.a ?? left.m11 ?? 1;
+  const lb = left.b ?? left.m12 ?? 0;
+  const lc = left.c ?? left.m21 ?? 0;
+  const ld = left.d ?? left.m22 ?? 1;
+  const le = left.e ?? left.m41 ?? 0;
+  const lf = left.f ?? left.m42 ?? 0;
+  const ra = right.a ?? right.m11 ?? 1;
+  const rb = right.b ?? right.m12 ?? 0;
+  const rc = right.c ?? right.m21 ?? 0;
+  const rd = right.d ?? right.m22 ?? 1;
+  const re = right.e ?? right.m41 ?? 0;
+  const rf = right.f ?? right.m42 ?? 0;
+
+  return {
+    a: la * ra + lc * rb,
+    b: lb * ra + ld * rb,
+    c: la * rc + lc * rd,
+    d: lb * rc + ld * rd,
+    e: la * re + lc * rf + le,
+    f: lb * re + ld * rf + lf,
+  };
 }
 
 function extractDocxRawBlocks(buffer: Buffer): RawBlock[] {

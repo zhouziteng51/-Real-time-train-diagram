@@ -73,8 +73,8 @@ export class ImportController {
 
   @Get(":jobId/preview")
   @Roles("DISPATCHER")
-  preview(@Param("jobId") jobId: string): NormalizedImportDocument {
-    const doc = this.store.getDoc(jobId);
+  async preview(@Param("jobId") jobId: string): Promise<NormalizedImportDocument> {
+    const doc = await this.store.getDoc(jobId);
     if (!doc) throw new BadRequestException("preview not ready yet");
     return doc;
   }

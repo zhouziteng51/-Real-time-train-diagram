@@ -1,10 +1,17 @@
 import { Inject, Injectable, Logger, OnModuleInit, Optional } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import type { ImportJob, NormalizedImportDocument } from "@metro-ops/shared";
-import { assertTransitionImport, WS_EVENTS, importJobRoom } from "@metro-ops/shared";
+import {
+  NormalizedImportDocumentSchema,
+  assertTransitionImport,
+  WS_EVENTS,
+  importJobRoom,
+} from "@metro-ops/shared";
 import { RealtimeGateway } from "../realtime/realtime.gateway.js";
 import { PostgresService } from "../persistence/postgres.service.js";
 import { ObjectStorageService } from "../storage/object-storage.service.js";
+import { ParserFactory } from "./parsers/parser.factory.js";
+import { overallScore, scoreDocument } from "./parsers/types.js";
 
 export interface StoredFile {
   key: string;
@@ -22,6 +29,8 @@ export class ImportStore implements OnModuleInit {
     @Inject(RealtimeGateway) private readonly realtime: RealtimeGateway,
     @Inject(ObjectStorageService)
     private readonly objectStorage: ObjectStorageService,
+    @Inject(ParserFactory)
+    private readonly parserFactory: ParserFactory,
     @Optional()
     @Inject(PostgresService)
     private readonly postgres?: PostgresService,
@@ -85,10 +94,18 @@ export class ImportStore implements OnModuleInit {
 
   saveDoc(jobId: string, doc: NormalizedImportDocument): void {
     this.docs.set(jobId, doc);
+    this.objectStorage.write(docStorageKey(jobId), encodeDoc(doc));
   }
 
-  getDoc(jobId: string): NormalizedImportDocument | undefined {
-    return this.docs.get(jobId);
+  async getDoc(jobId: string): Promise<NormalizedImportDocument | undefined> {
+    const cached = this.docs.get(jobId);
+    if (cached) return cached;
+
+    const persisted = this.readPersistedDoc(jobId);
+    if (persisted) return persisted;
+
+    if (!this.jobs.has(jobId)) return undefined;
+    return this.rebuildPersistedDoc(jobId);
   }
 
   transition(jobId: string, patch: Partial<ImportJob> & { status: ImportJob["status"] }): ImportJob {
@@ -111,4 +128,79 @@ export class ImportStore implements OnModuleInit {
       job,
     });
   }
+
+  private readPersistedDoc(jobId: string): NormalizedImportDocument | undefined {
+    try {
+      const parsed = JSON.parse(
+        this.objectStorage.read(docStorageKey(jobId)).toString("utf8"),
+      );
+      const result = NormalizedImportDocumentSchema.safeParse(parsed);
+      if (!result.success) {
+        this.logger.warn(`stored parsed doc invalid for import job ${jobId}`);
+        return undefined;
+      }
+      this.docs.set(jobId, result.data);
+      return result.data;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async rebuildPersistedDoc(
+    jobId: string,
+  ): Promise<NormalizedImportDocument | undefined> {
+    const job = this.mustFindJob(jobId);
+    if (
+      job.status !== "REVIEW_REQUIRED" &&
+      job.status !== "NORMALIZED" &&
+      job.status !== "IMPORTED"
+    ) {
+      return undefined;
+    }
+
+    try {
+      const parser = this.parserFactory.create(job.sourceType);
+      const extracted = await parser.extract(this.readFile(job.storageKey), {
+        fileName: job.fileName,
+      });
+      const confidence = scoreDocument(extracted);
+      const doc: NormalizedImportDocument = {
+        ...extracted,
+        meta: { ...extracted.meta, confidence },
+      };
+      this.saveDoc(jobId, doc);
+
+      const patch: Partial<ImportJob> = {
+        parserName: parser.name,
+        confidence,
+        confidenceScore: overallScore(confidence),
+        warnings: doc.warnings,
+      };
+      const current = this.mustFindJob(jobId);
+      const next: ImportJob = {
+        ...current,
+        ...patch,
+        updatedAt: new Date().toISOString(),
+      };
+      this.jobs.set(jobId, next);
+      void this.postgres?.upsertImportJob(next);
+      this.emit(next);
+      this.logger.log(`rebuilt parsed document for import job ${jobId}`);
+      return doc;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `could not rebuild parsed document for import job ${jobId}: ${message}`,
+      );
+      return undefined;
+    }
+  }
+}
+
+function docStorageKey(jobId: string): string {
+  return `imports/${jobId}/normalized-document.json`;
+}
+
+function encodeDoc(doc: NormalizedImportDocument): Buffer {
+  return Buffer.from(`${JSON.stringify(doc)}\n`, "utf8");
 }

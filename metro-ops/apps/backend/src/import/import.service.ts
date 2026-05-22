@@ -24,9 +24,6 @@ export class ImportDomainService {
     jobId: string,
     body: ConfirmImportBody,
   ): Promise<void> {
-    const doc = this.store.getDoc(jobId);
-    if (!doc) throw new Error(`parsed document not ready for job ${jobId}`);
-
     const job = this.store.mustFindJob(jobId);
     if (job.status === "IMPORTED") return;
     if (job.status !== "REVIEW_REQUIRED" && job.status !== "NORMALIZED") {
@@ -34,6 +31,9 @@ export class ImportDomainService {
         "only REVIEW_REQUIRED or NORMALIZED jobs can be imported",
       );
     }
+
+    const doc = await this.store.getDoc(jobId);
+    if (!doc) throw new Error(`parsed document not ready for job ${jobId}`);
 
     if (job.status === "REVIEW_REQUIRED") {
       this.store.transition(jobId, { status: "NORMALIZED" });

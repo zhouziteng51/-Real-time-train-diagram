@@ -20,11 +20,24 @@ type ImportTrain = NormalizedImportDocument["trains"][number];
 export class PostgresService implements OnModuleInit, OnModuleDestroy {
   private pool: pg.Pool | undefined;
   private ready = false;
+  private readonly readyDeferred: {
+    promise: Promise<void>;
+    resolve: (() => void) | undefined;
+  };
+
+  constructor() {
+    let resolve: (() => void) | undefined;
+    const promise = new Promise<void>((done) => {
+      resolve = done;
+    });
+    this.readyDeferred = { promise, resolve };
+  }
 
   async onModuleInit(): Promise<void> {
     const connectionString = process.env.DATABASE_URL;
     if (!connectionString) {
       logger.info({ event: "postgres.disabled" }, "postgres disabled");
+      this.readyDeferred.resolve?.();
       return;
     }
 
@@ -36,6 +49,8 @@ export class PostgresService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.ready = false;
       logError("postgres.init_failed", error);
+    } finally {
+      this.readyDeferred.resolve?.();
     }
   }
 
@@ -45,6 +60,11 @@ export class PostgresService implements OnModuleInit, OnModuleDestroy {
 
   isEnabled(): boolean {
     return this.ready && this.pool !== undefined;
+  }
+
+  whenReady(): Promise<void> {
+    if (this.ready) return Promise.resolve();
+    return this.readyDeferred.promise;
   }
 
   async upsertTrip(trip: TripTask): Promise<void> {
