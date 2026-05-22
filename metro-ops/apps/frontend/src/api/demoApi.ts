@@ -10,7 +10,7 @@ import type {
   TripTask,
 } from "@metro-ops/shared";
 import { nextTripStatus } from "@metro-ops/shared";
-import { hasRemoteApiBaseUrl } from "./config.js";
+import { isExplicitDemoApiEnabled } from "./config.js";
 
 interface DemoApiOptions {
   method?: string | undefined;
@@ -58,22 +58,11 @@ let demoDocs: Record<string, NormalizedImportDocument> = {
 };
 
 export function shouldUseDemoApi(): boolean {
-  if (typeof window === "undefined") return false;
-  if (hasRemoteApiBaseUrl()) return false;
-  if (isLocalDevelopmentHost()) return false;
-  const flag = import.meta.env.VITE_DEMO_API;
-  if (flag === "true") return true;
-  if (flag === "false") return false;
-  return window.location.hostname.endsWith(".netlify.app");
+  return isExplicitDemoApiEnabled();
 }
 
 export function canFallbackToDemoApi(): boolean {
-  return shouldUseDemoApi() || !isLocalDevelopmentHost();
-}
-
-function isLocalDevelopmentHost(): boolean {
-  if (typeof window === "undefined") return false;
-  return ["127.0.0.1", "localhost", "::1"].includes(window.location.hostname);
+  return shouldUseDemoApi();
 }
 
 export async function demoApiFetch<T>(

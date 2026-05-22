@@ -31,17 +31,13 @@ export async function apiFetch<T>(path: string, opts: ApiFetchOptions = {}): Pro
   try {
     res = await fetch(apiUrl(path), init);
   } catch (err) {
-    if (isApiPath(path) && canFallbackToDemoApi()) {
+    if (canFallbackToDemoApi()) {
       return demoApiFetch<T>(path, { method: rest.method, body });
     }
     throw err;
   }
   if (!res.ok) {
-    if (
-      isApiPath(path) &&
-      canFallbackToDemoApi() &&
-      [404, 405, 502, 503, 504].includes(res.status)
-    ) {
+    if (canFallbackToDemoApi()) {
       return demoApiFetch<T>(path, { method: rest.method, body });
     }
     const text = await res.text().catch(() => "");
@@ -49,10 +45,6 @@ export async function apiFetch<T>(path: string, opts: ApiFetchOptions = {}): Pro
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
-}
-
-function isApiPath(path: string): boolean {
-  return path.startsWith("/api/");
 }
 
 export function defaultAuthHeaders(role = "DISPATCHER"): Record<string, string> {

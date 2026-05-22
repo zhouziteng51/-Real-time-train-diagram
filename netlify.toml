@@ -1,0 +1,13 @@
+[build]
+  base = "metro-ops"
+  command = "pnpm --filter @metro-ops/shared build && pnpm --filter @metro-ops/frontend build"
+  publish = "apps/frontend/dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+  PNPM_VERSION = "9.0.0"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
