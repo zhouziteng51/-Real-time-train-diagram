@@ -1,0 +1,20 @@
+<view class="page">
+  <view class="card">
+    <view class="title">排班</view>
+    <view class="subtle">当前时间：{{runtimeSummary.timeLabel}}</view>
+    <view class="subtle">今日执行：{{runtimeSummary.scheduleSourceLabel}}</view>
+  </view>
+
+  <view class="card">
+    <block wx:for="{{summaryRows}}" wx:key="shift">
+      <view class="trip-row">
+        <view class="trip-main">
+          <view class="trip-title">{{item.shift}}</view>
+        </view>
+        <view class="pill pill-primary">{{item.count}}</view>
+      </view>
+    </block>
+    <view wx:if="{{loading}}" class="empty">加载中...</view>
+    <view wx:if="{{!loading && summaryRows.length === 0}}" class="empty">暂无排班数据</view>
+  </view>
+</view>

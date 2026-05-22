@@ -1,0 +1,39 @@
+<view class="page">
+  <view class="card">
+    <view class="row">
+      <view class="stack">
+        <view class="title">运行图</view>
+        <view class="subtle">最近同步：{{lastSyncAt}}</view>
+      </view>
+      <view class="pill pill-primary">{{connectionLabel}}</view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="table-head">
+      <view class="cell train">车次</view>
+      <view class="cell route">交路</view>
+      <view class="cell status">状态</view>
+      <view class="cell speed">速度</view>
+      <view class="cell delay">晚点</view>
+      <view class="cell updated">更新时间</view>
+    </view>
+
+    <block wx:for="{{vehicles}}" wx:key="vehicleId">
+      <view class="table-row">
+        <view class="cell train">
+          <view class="mono-bold">{{item.trainNo}}</view>
+          <view class="subtle mono">{{item.tripId || '--'}}</view>
+        </view>
+        <view class="cell route mono">{{item.routeId}}</view>
+        <view class="cell status">{{item.statusLabel}}</view>
+        <view class="cell speed mono">{{item.speedText}}</view>
+        <view class="cell delay mono">{{item.delayText}}</view>
+        <view class="cell updated mono subtle">{{item.updatedAt}}</view>
+      </view>
+    </block>
+
+    <view wx:if="{{errorLabel}}" class="empty">运行图读取失败：{{errorLabel}}</view>
+    <view wx:if="{{!errorLabel && vehicles.length === 0}}" class="empty">暂无实时车位数据</view>
+  </view>
+</view>

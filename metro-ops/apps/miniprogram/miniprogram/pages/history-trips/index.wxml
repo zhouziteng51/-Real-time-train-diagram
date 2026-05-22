@@ -1,0 +1,20 @@
+<view class="page">
+  <view class="card">
+    <view class="title">历史车次</view>
+    <view class="subtle">当前运行图：{{runtimeSummary.scheduleLabel}}</view>
+  </view>
+
+  <view class="card">
+    <block wx:for="{{trips}}" wx:key="id">
+      <view class="trip-row">
+        <view class="trip-main">
+          <view class="trip-title">{{item.trainNo}} · {{item.routeId}}</view>
+          <view class="subtle">{{item.scheduleVersionId}} · {{item.timeRange}}</view>
+        </view>
+        <view class="pill pill-gray">{{item.statusLabel}}</view>
+      </view>
+    </block>
+    <view wx:if="{{loading}}" class="empty">加载中...</view>
+    <view wx:if="{{!loading && trips.length === 0}}" class="empty">没有符合条件的历史车次</view>
+  </view>
+</view>

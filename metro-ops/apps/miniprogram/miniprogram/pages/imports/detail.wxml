@@ -1,0 +1,172 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="card">
+    <view class="empty">加载中...</view>
+  </view>
+
+  <view wx:if="{{errorLabel}}" class="card">
+    <view class="empty error">导入任务读取失败：{{errorLabel}}</view>
+  </view>
+
+  <block wx:if="{{!loading && !errorLabel && job}}">
+    <view class="card">
+      <view class="detail-head">
+        <view class="job-main">
+          <view class="title">{{job.fileName}}</view>
+          <view class="subtle">{{job.sourceTypeLabel}} · {{job.parserName || '等待解析'}}</view>
+          <view class="subtle">创建 {{job.createdAtText}} · 更新 {{job.updatedAtText}}</view>
+        </view>
+        <view class="pill {{job.statusClass}}">{{job.statusLabel}}</view>
+      </view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">状态与置信度</view>
+      <view class="metric-grid">
+        <view class="metric-cell">
+          <view class="metric-label">整体置信度</view>
+          <view class="metric-value">{{job.confidenceSummary}}</view>
+        </view>
+        <view class="metric-cell">
+          <view class="metric-label">告警</view>
+          <view class="metric-value">{{job.warningsText.length}}</view>
+        </view>
+        <view class="metric-cell">
+          <view class="metric-label">错误</view>
+          <view class="metric-value">{{job.errorsText.length}}</view>
+        </view>
+      </view>
+
+      <block wx:for="{{job.confidenceBars}}" wx:key="key">
+        <view class="confidence-row">
+          <view class="confidence-label">{{item.label}}</view>
+          <view class="confidence-track">
+            <view class="confidence-bar {{item.barClass}}" style="width: {{item.barWidth}};"></view>
+          </view>
+          <view class="confidence-value">{{item.percentText}}</view>
+        </view>
+      </block>
+
+      <view wx:if="{{job.confidenceBars.length === 0}}" class="empty">还没有置信度数据</view>
+    </view>
+
+    <view wx:if="{{job.errorsText.length > 0 || job.warningsText.length > 0}}" class="card">
+      <view class="section-title">告警与错误</view>
+      <block wx:for="{{job.errorsText}}" wx:key="*this">
+        <view class="issue issue-error">错误：{{item}}</view>
+      </block>
+      <block wx:for="{{job.warningsText}}" wx:key="*this">
+        <view class="issue issue-warning">需复核：{{item}}</view>
+      </block>
+    </view>
+
+    <view class="card">
+      <view class="section-title">确认信息</view>
+      <view class="section-help">选择这次确认要写入的导入内容，默认三段都接受。</view>
+
+      <view class="section-toggle-row">
+        <view class="section-toggle {{acceptedSections.trains ? 'section-toggle-on' : ''}}" data-key="trains" bindtap="onToggleSection">
+          <view class="toggle-title">车次</view>
+          <view class="toggle-sub">{{acceptedSections.trains ? '接受' : '跳过'}}</view>
+        </view>
+        <view class="section-toggle {{acceptedSections.segments ? 'section-toggle-on' : ''}}" data-key="segments" bindtap="onToggleSection">
+          <view class="toggle-title">交路</view>
+          <view class="toggle-sub">{{acceptedSections.segments ? '接受' : '跳过'}}</view>
+        </view>
+        <view class="section-toggle {{acceptedSections.duties ? 'section-toggle-on' : ''}}" data-key="duties" bindtap="onToggleSection">
+          <view class="toggle-title">值乘</view>
+          <view class="toggle-sub">{{acceptedSections.duties ? '接受' : '跳过'}}</view>
+        </view>
+      </view>
+
+      <view class="form-row">
+        <view class="form-label">目标时刻表名</view>
+        <input class="form-input" value="{{targetScheduleVersionName}}" placeholder="可选，例如 G6001" bindinput="onTargetScheduleInput" />
+      </view>
+      <view class="form-row">
+        <view class="form-label">值乘日期</view>
+        <input class="form-input" value="{{dutyDate}}" placeholder="可选，例如 2026-05-21" bindinput="onDutyDateInput" />
+      </view>
+
+      <button class="btn btn-primary confirm-btn" disabled="{{!job.canConfirm || actionLoading}}" bindtap="confirmImport">
+        {{actionLoading ? '确认中...' : '确认入库'}}
+      </button>
+      <view wx:if="{{!job.canConfirm}}" class="section-help">当前状态不可确认入库。</view>
+      <view wx:if="{{confirmErrorLabel}}" class="empty error">确认入库失败：{{confirmErrorLabel}}</view>
+    </view>
+
+    <view class="card">
+      <view class="detail-head">
+        <view>
+          <view class="section-title">Parsed Doc 预览</view>
+          <view class="section-help">来自 /api/imports/:jobId/preview，历史任务可在重启后恢复。</view>
+        </view>
+        <view wx:if="{{preview}}" class="pill pill-gray">{{preview.meta.sourceTypeLabel}}</view>
+      </view>
+
+      <view wx:if="{{previewLoading}}" class="empty">预览加载中...</view>
+      <view wx:if="{{previewErrorLabel}}" class="empty error">预览读取失败：{{previewErrorLabel}}</view>
+
+      <block wx:if="{{preview}}">
+        <view class="metric-grid preview-metrics">
+          <block wx:for="{{preview.metrics}}" wx:key="label">
+            <view class="metric-cell">
+              <view class="metric-label">{{item.label}}</view>
+              <view class="metric-value">{{item.value}}</view>
+            </view>
+          </block>
+        </view>
+
+        <view wx:if="{{preview.meta.confidenceSummary}}" class="section-help">{{preview.meta.confidenceSummary}}</view>
+
+        <view wx:if="{{preview.warningsText.length > 0}}" class="preview-block">
+          <view class="preview-title">预览告警</view>
+          <block wx:for="{{preview.warningsText}}" wx:key="*this">
+            <view class="issue issue-warning">{{item}}</view>
+          </block>
+        </view>
+
+        <view class="preview-block">
+          <view class="preview-title">车次预览</view>
+          <block wx:for="{{preview.trainsPreview}}" wx:key="previewKey">
+            <view class="preview-row">
+              <view class="row-main">
+                <view class="row-title">{{item.trainNo}} · {{item.directionText}}</view>
+                <view class="subtle">{{item.stationRange}}</view>
+              </view>
+              <view class="pill pill-gray">{{item.stationCount}}站</view>
+            </view>
+          </block>
+          <view wx:if="{{preview.trainsPreview.length === 0}}" class="empty">未识别到可预览车次</view>
+        </view>
+
+        <view class="preview-block">
+          <view class="preview-title">交路预览</view>
+          <block wx:for="{{preview.segmentsPreview}}" wx:key="previewKey">
+            <view class="preview-row">
+              <view class="row-main">
+                <view class="row-title">{{item.fromStationName}} 至 {{item.toStationName}}</view>
+                <view class="subtle">{{item.timeRange}}</view>
+              </view>
+              <view class="pill pill-gray">{{item.trainCount}}车次</view>
+            </view>
+          </block>
+          <view wx:if="{{preview.segmentsPreview.length === 0}}" class="empty">未识别到可预览交路</view>
+        </view>
+
+        <view class="preview-block">
+          <view class="preview-title">值乘预览</view>
+          <block wx:for="{{preview.dutiesPreview}}" wx:key="previewKey">
+            <view class="preview-row duty-preview-row">
+              <view class="row-main">
+                <view class="row-title">{{item.title}}</view>
+                <view class="subtle">{{item.subtitle || '暂无车次/交路'}}</view>
+                <view wx:if="{{item.notesText}}" class="subtle">{{item.notesText}}</view>
+              </view>
+            </view>
+          </block>
+          <view wx:if="{{preview.dutiesPreview.length === 0}}" class="empty">未识别到可预览值乘</view>
+        </view>
+      </block>
+    </view>
+  </block>
+</view>

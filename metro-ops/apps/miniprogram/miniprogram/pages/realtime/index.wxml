@@ -1,32 +1,8 @@
-<view class="page">
-  <view class="card">
-    <view class="row">
-      <view>
-        <view class="title">实时车次</view>
-        <view class="subtle">{{operatorName}} · {{operatorId}}</view>
-      </view>
-      <view class="pill pill-primary">{{connectionLabel}}</view>
-    </view>
-    <view class="meta-grid">
-      <view class="meta-item">
-        <view class="meta-label">当前时间</view>
-        <view class="meta-value">{{runtimeSummary.timeLabel}}</view>
-      </view>
-      <view class="meta-item">
-        <view class="meta-label">今日执行</view>
-        <view class="meta-value">{{runtimeSummary.scheduleLabel}}</view>
-      </view>
-      <view class="meta-item wide">
-        <view class="meta-label">运行图来源</view>
-        <view class="meta-value">{{runtimeSummary.scheduleSourceLabel}}</view>
-      </view>
-    </view>
-  </view>
-
+<view class="page dashboard-page">
   <view class="metrics-grid">
     <view class="metric-card">
       <view class="metric-label">当前值乘</view>
-      <view class="metric-value">{{duties.length}}</view>
+      <view class="metric-value metric-primary">{{duties.length}}</view>
     </view>
     <view class="metric-card">
       <view class="metric-label">区间运行</view>
@@ -34,60 +10,73 @@
     </view>
     <view class="metric-card">
       <view class="metric-label">停站</view>
-      <view class="metric-value">{{dwellingCount}}</view>
+      <view class="metric-value metric-primary">{{dwellingCount}}</view>
     </view>
   </view>
 
-  <view class="card">
-    <view class="section-title">当前人员值乘</view>
-    <block wx:for="{{duties}}" wx:key="operatorId">
-      <view class="duty-row {{item.isCurrentDriverDuty ? 'current-duty' : ''}}">
-        <view class="duty-topline">
-          <view class="route-badge">
-            <view class="route-badge-label">交路</view>
-            <view class="route-badge-value">{{item.routeLabel}}</view>
-            <view class="route-badge-shift">{{item.shiftLabel}}</view>
-          </view>
-          <view class="duty-main">
-            <view class="font-bold">{{item.operatorName}}</view>
-            <view class="subtle">人员</view>
-          </view>
-          <view wx:if="{{item.isCurrentDriverDuty}}" class="pill pill-primary">我的班</view>
+  <view class="dashboard-card">
+    <view class="dashboard-header">
+      <view class="section-heading">
+        <view class="section-icon">群</view>
+        <view class="section-title">当前人员值乘</view>
+      </view>
+      <view class="summary-block">
+        <view class="summary-line">当前时间：{{runtimeSummary.timeLabel}}</view>
+        <view class="summary-line">今日执行：{{runtimeSummary.scheduleSourceLabel}}</view>
+      </view>
+    </view>
+
+    <scroll-view class="table-scroll" scroll-x="true" enhanced="true">
+      <view class="duty-table">
+        <view class="table-row table-head">
+          <view class="table-cell route-col">交路</view>
+          <view class="table-cell operator-col">人员</view>
+          <view class="table-cell train-col">车次</view>
+          <view class="table-cell direction-col">上/下行</view>
+          <view class="table-cell location-col">所在位置</view>
+          <view class="table-cell status-col">实时状态</view>
+          <view class="table-cell time-col">计划时间</view>
+          <view class="table-cell source-col">时刻表来源</view>
         </view>
 
-        <view class="duty-grid">
-          <view class="duty-cell">
-            <view class="cell-label">车次</view>
-            <view class="cell-value">{{item.trainNo}}</view>
-            <view class="cell-sub">{{item.routeId}}</view>
-          </view>
-          <view class="duty-cell">
-            <view class="cell-label">上/下行</view>
-            <view class="cell-value">{{item.directionText}}</view>
-          </view>
-          <view class="duty-cell wide">
-            <view class="cell-label">所在位置</view>
-            <view class="cell-value">{{item.location}}</view>
-            <view class="cell-sub">{{item.stationPair}}</view>
-          </view>
-          <view class="duty-cell">
-            <view class="cell-label">实时状态</view>
-            <view class="status-line">
-              <view class="pill pill-green">{{item.runtimeStatusLabel}}</view>
-              <view class="pill pill-amber">{{item.locationKindLabel}}</view>
+        <block wx:for="{{duties}}" wx:key="dutyKey">
+          <view class="table-row duty-row">
+            <view class="table-cell route-col">
+              <view class="route-badge">
+                <view class="route-badge-label">
+                  <view class="route-dot"></view>
+                  <text>交路</text>
+                </view>
+                <view class="route-badge-value">{{item.routeLabel}}</view>
+                <view class="route-badge-shift">{{item.shiftLabel}}</view>
+              </view>
             </view>
+            <view class="table-cell operator-col">
+              <view class="operator-name">{{item.operatorName}}</view>
+            </view>
+            <view class="table-cell train-col">
+              <view class="mono-bold">{{item.trainNo}}</view>
+              <view class="cell-sub">{{item.routeIdLabel}}</view>
+            </view>
+            <view class="table-cell direction-col">{{item.directionText}}</view>
+            <view class="table-cell location-col">
+              <view class="cell-strong">{{item.location}}</view>
+              <view class="cell-sub">{{item.stationPair}}</view>
+            </view>
+            <view class="table-cell status-col">
+              <view class="status-line">
+                <view class="status-chip status-running">{{item.runtimeStatusLabel}}</view>
+                <view class="status-chip status-location">{{item.locationKindLabel}}</view>
+              </view>
+            </view>
+            <view class="table-cell time-col mono-text">{{item.timeRange}}</view>
+            <view class="table-cell source-col source-text">{{item.scheduleSource}}</view>
           </view>
-          <view class="duty-cell">
-            <view class="cell-label">计划时间</view>
-            <view class="cell-value">{{item.timeRange}}</view>
-          </view>
-          <view class="duty-cell wide">
-            <view class="cell-label">时刻表来源</view>
-            <view class="cell-value">{{item.scheduleSource}}</view>
-          </view>
-        </view>
+        </block>
+
+        <view wx:if="{{errorLabel}}" class="empty-row error-row">实时数据读取失败：{{errorLabel}}</view>
+        <view wx:if="{{!errorLabel && duties.length === 0}}" class="empty-row">当前时间没有匹配到正在运行的真实车次</view>
       </view>
-    </block>
-    <view wx:if="{{duties.length === 0}}" class="subtle">当前时间没有匹配到正在运行的真实车次</view>
+    </scroll-view>
   </view>
 </view>

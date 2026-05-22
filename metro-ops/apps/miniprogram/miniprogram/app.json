@@ -1,11 +1,52 @@
 {
   "pages": [
     "pages/home/index",
+    "pages/running-graph/index",
+    "pages/attached-route/index",
     "pages/trip/index",
-    "pages/realtime/index"
+    "pages/realtime/index",
+    "pages/more/index",
+    "pages/master-schedule/index",
+    "pages/daily-roster/index",
+    "pages/history-trips/index",
+    "pages/imports/index",
+    "pages/imports/detail",
+    "pages/backend-settings/index"
   ],
+  "tabBar": {
+    "color": "#64748b",
+    "selectedColor": "#2563eb",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/home/index",
+        "text": "首页",
+        "iconPath": "assets/tab-home.png",
+        "selectedIconPath": "assets/tab-home-active.png"
+      },
+      {
+        "pagePath": "pages/running-graph/index",
+        "text": "运行图",
+        "iconPath": "assets/tab-running.png",
+        "selectedIconPath": "assets/tab-running-active.png"
+      },
+      {
+        "pagePath": "pages/attached-route/index",
+        "text": "交路",
+        "iconPath": "assets/tab-route.png",
+        "selectedIconPath": "assets/tab-route-active.png"
+      },
+      {
+        "pagePath": "pages/more/index",
+        "text": "更多",
+        "iconPath": "assets/tab-more.png",
+        "selectedIconPath": "assets/tab-more-active.png"
+      }
+    ]
+  },
   "window": {
-    "navigationBarTitleText": "实时时刻表",
+    "navigationBarTitleText": "地铁运行控制台",
     "navigationBarBackgroundColor": "#0f172a",
     "navigationBarTextStyle": "white",
     "backgroundColor": "#f8fafc"

@@ -1,4 +1,9 @@
 const { apiRequest } = require("./api");
+const { formatActiveSchedule } = require("./format");
+const {
+  applyOperatorIdentity,
+  readOperatorIdentity,
+} = require("./operatorIdentity");
 
 function buildRuntimeSummary(runtime) {
   const currentTime = runtime?.currentTime;
@@ -13,25 +18,9 @@ function buildRuntimeSummary(runtime) {
 }
 
 async function loadCurrentOperator() {
-  const app = getApp();
-  const fallback = {
-    operatorId: app.globalData?.operatorId || "op-001",
-    operatorName: app.globalData?.operatorName || "司机",
-    role: app.globalData?.operatorRole || "DRIVER",
-  };
-
-  try {
-    const remote = await apiRequest("/api/operators/me");
-    app.globalData.operatorId = remote.operatorId;
-    app.globalData.operatorName = remote.operatorName;
-    app.globalData.operatorRole = remote.role || "DRIVER";
-    return remote;
-  } catch (_error) {
-    app.globalData.operatorId = fallback.operatorId;
-    app.globalData.operatorName = fallback.operatorName;
-    app.globalData.operatorRole = fallback.role;
-    return fallback;
-  }
+  const identity = readOperatorIdentity();
+  applyOperatorIdentity(identity);
+  return identity;
 }
 
 async function loadCurrentDriverTrip(operator) {
@@ -200,15 +189,6 @@ function cleanIdPart(value) {
     .replace(/[^a-zA-Z0-9_-]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 48);
-}
-
-function formatActiveSchedule(schedule) {
-  if (!schedule) return "--";
-  const source =
-    schedule.source === "IMPORTED"
-      ? schedule.sourceFileName || "已确认入库"
-      : "内置兜底";
-  return `${schedule.label}（${schedule.scheduleVersionId} · ${source}）`;
 }
 
 function shortHash(value) {

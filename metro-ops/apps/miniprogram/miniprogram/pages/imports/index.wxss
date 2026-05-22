@@ -1,0 +1,48 @@
+.job-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 18rpx 0;
+  border-top: 1px solid #e2e8f0;
+}
+
+.job-row:first-of-type {
+  border-top: 0;
+}
+
+.job-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.job-title {
+  color: #0f172a;
+  font-size: 28rpx;
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.job-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8rpx;
+  flex-shrink: 0;
+}
+
+.meta-line {
+  margin-top: 6rpx;
+  color: #475569;
+  font-size: 22rpx;
+  line-height: 1.4;
+}
+
+.empty {
+  padding-top: 18rpx;
+  color: #64748b;
+  font-size: 24rpx;
+}
+
+.error {
+  color: #b91c1c;
+}

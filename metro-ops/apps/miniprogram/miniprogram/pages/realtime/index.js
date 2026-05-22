@@ -1,107 +1,74 @@
-const {
-  buildRuntimeSummary,
-  loadCurrentDriverTrip,
-  loadCurrentOperator,
-} = require("../../utils/duty");
+const { loadCurrentOperator } = require("../../utils/duty");
+const { loadRuntimeDashboard } = require("../../utils/runtimeDashboard");
 const { globalRoom } = require("../../utils/rooms");
 const { RealtimeSocket } = require("../../utils/ws");
-const {
-  directionLabel,
-  dutyLocationHint,
-  dutyRouteLabel,
-  formatClockRange,
-  locationKindLabel,
-  runtimeStatusLabel,
-  scheduleSourceLabel,
-  statusLabel,
-} = require("../../utils/format");
+const { onBackendConfigChanged } = require("../../utils/backendConfig");
+const { onOperatorIdentityChanged } = require("../../utils/operatorIdentity");
 
 Page({
   data: {
     operatorId: "",
     operatorName: "",
+    connectionLabel: "离线",
     currentDuty: null,
     runtimeSummary: {
       timeLabel: "--",
       scheduleLabel: "--",
       scheduleSourceLabel: "--",
     },
-    trips: [],
     duties: [],
-    connectionLabel: "离线",
     runningCount: 0,
     dwellingCount: 0,
-    currentDutyStatusLabel: "--",
-    currentDutyLocationKind: "--",
-    currentDutyLocationHint: "--",
-    currentDutyLocationText: "--",
-    currentDutyDirectionText: "--",
-    currentDutyTimeRange: "--",
+    errorLabel: "",
   },
   socket: null,
+  unwatchBackendConfig: null,
+  unwatchOperatorIdentity: null,
 
   async onLoad() {
-    const operator = await loadCurrentOperator();
-    this.setData({
-      operatorId: operator.operatorId,
-      operatorName: operator.operatorName,
-    });
     await this.refresh();
     this.bindRealtime();
+    this.unwatchBackendConfig = onBackendConfigChanged(() => this.reconnect());
+    this.unwatchOperatorIdentity = onOperatorIdentityChanged(() =>
+      this.reconnect(),
+    );
   },
 
   onUnload() {
     this.socket?.close();
+    this.unwatchBackendConfig?.();
+    this.unwatchOperatorIdentity?.();
   },
 
   async refresh() {
-    const result = await loadCurrentDriverTrip(this.currentOperator());
-    const trips = this.orderTripsForDriver(
-      result.activeTrips,
-      result.currentTrip,
-    );
-    const runtimeSummary = buildRuntimeSummary(result.runtime);
-    const currentDuty = result.currentDuty;
-    const duties = this.orderDutiesForDriver(
-      result.runtime?.duties || [],
-      currentDuty,
-    ).map((duty) => this.decorateDuty(duty, currentDuty));
-    this.setData({
-      currentDuty,
-      runtimeSummary,
-      duties,
-      runningCount: duties.filter((duty) => duty.status === "RUNNING").length,
-      dwellingCount: duties.filter((duty) => duty.status === "DWELLING").length,
-      currentDutyStatusLabel: runtimeStatusLabel(currentDuty?.status),
-      currentDutyLocationKind: locationKindLabel(currentDuty?.locationKind),
-      currentDutyLocationHint: dutyLocationHint(currentDuty),
-      currentDutyLocationText: currentDuty?.location || "未接入实时位置",
-      currentDutyDirectionText: directionLabel(currentDuty?.direction),
-      currentDutyTimeRange: currentDuty
-        ? formatClockRange(
-            currentDuty.plannedDepartureTime,
-            currentDuty.plannedArrivalTime,
-          )
-        : "--",
-      trips: trips.map((trip) => {
-        return {
-          ...trip,
-          statusLabel: statusLabel(trip.status),
-          statusClass: this.statusClassOf(trip.status),
-          isCurrentDriverTrip: trip.id === result.currentTrip?.id,
-          dutyTimeRange: formatClockRange(
-            trip.plannedDepartureAt,
-            trip.plannedArrivalAt,
-          ),
-          directionText: directionLabel(trip.direction),
-        };
-      }),
-    });
+    try {
+      const operator = await loadCurrentOperator();
+      this.setData({
+        operatorId: operator.operatorId,
+        operatorName: operator.operatorName,
+      });
+      const result = await loadRuntimeDashboard(operator);
+      this.setData({
+        currentDuty: result.currentDuty,
+        runtimeSummary: result.runtimeSummary,
+        duties: result.duties,
+        runningCount: result.runningCount,
+        dwellingCount: result.dwellingCount,
+        errorLabel: "",
+      });
+    } catch (error) {
+      this.setData({
+        errorLabel: error?.message || "实时数据读取失败",
+      });
+    }
   },
 
   bindRealtime() {
+    this.socket?.close();
     const socket = new RealtimeSocket("/ws/network");
     this.socket = socket;
+    socket.onOpen(() => this.setData({ connectionLabel: "在线" }));
+    socket.onClose(() => this.setData({ connectionLabel: "离线" }));
     socket.connect();
     socket.subscribe([globalRoom()]);
     socket.onMessage((payload) => {
@@ -109,7 +76,13 @@ Page({
         this.refresh();
       }
     });
-    this.setData({ connectionLabel: "在线" });
+    this.setData({ connectionLabel: "连接中" });
+  },
+
+  async reconnect() {
+    this.socket?.close();
+    await this.refresh();
+    this.bindRealtime();
   },
 
   currentOperator() {
@@ -117,59 +90,5 @@ Page({
       operatorId: this.data.operatorId,
       operatorName: this.data.operatorName,
     };
-  },
-
-  orderTripsForDriver(trips, currentTrip) {
-    if (!currentTrip) return trips;
-    return [
-      currentTrip,
-      ...trips.filter((trip) => trip.id !== currentTrip.id),
-    ];
-  },
-
-  orderDutiesForDriver(duties, currentDuty) {
-    if (!currentDuty) return duties;
-    return [
-      currentDuty,
-      ...duties.filter(
-        (duty) =>
-          duty.operatorId !== currentDuty.operatorId ||
-          duty.trainNo !== currentDuty.trainNo,
-      ),
-    ];
-  },
-
-  decorateDuty(duty, currentDuty) {
-    return {
-      ...duty,
-      routeLabel: dutyRouteLabel(duty),
-      shiftLabel: duty.dutyShiftName || "未识别班次",
-      directionText: directionLabel(duty.direction),
-      stationPair: dutyLocationHint(duty),
-      runtimeStatusLabel: runtimeStatusLabel(duty.status),
-      locationKindLabel: locationKindLabel(duty.locationKind),
-      timeRange: formatClockRange(
-        duty.plannedDepartureTime,
-        duty.plannedArrivalTime,
-      ),
-      scheduleSource: scheduleSourceLabel(duty),
-      isCurrentDriverDuty:
-        !!currentDuty &&
-        duty.operatorId === currentDuty.operatorId &&
-        duty.trainNo === currentDuty.trainNo,
-    };
-  },
-
-  statusClassOf(status) {
-    switch (status) {
-      case "ACTIVE":
-        return "pill-green";
-      case "ARRIVING_TERMINAL":
-        return "pill-amber";
-      case "ARCHIVED":
-        return "pill-gray";
-      default:
-        return "pill-primary";
-    }
   },
 });

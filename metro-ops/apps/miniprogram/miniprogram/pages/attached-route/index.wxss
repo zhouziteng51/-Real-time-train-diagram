@@ -1,0 +1,64 @@
+.current-card {
+  border: 1px solid #bfdbfe;
+  background: #f8fbff;
+}
+
+.trip-title {
+  margin: 8rpx 0 4rpx;
+  color: #0f172a;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.trip-meta {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: 12rpx;
+}
+
+.section-row {
+  margin-bottom: 8rpx;
+}
+
+.small-title {
+  font-size: 30rpx;
+}
+
+.trip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 18rpx 0;
+  border-top: 1px solid #e2e8f0;
+}
+
+.trip-row:first-of-type {
+  border-top: 0;
+}
+
+.trip-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.trip-name {
+  color: #0f172a;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.align-right {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.empty {
+  padding: 18rpx 0 0;
+  color: #64748b;
+  font-size: 24rpx;
+}
+
+.error {
+  color: #b91c1c;
+}

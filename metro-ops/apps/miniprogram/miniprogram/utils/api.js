@@ -1,13 +1,15 @@
 const app = getApp();
+const { readOperatorIdentity } = require("./operatorIdentity");
 
 function apiRequest(url, options = {}) {
-  const { body, header = {}, ...rest } = options;
+  const { body, header = {}, idempotencyKey, role, ...rest } = options;
   return new Promise((resolve, reject) => {
     wx.request({
       url: buildUrl(url),
       header: {
         "content-type": "application/json",
-        ...defaultAuthHeaders(),
+        ...defaultAuthHeaders(role),
+        ...(idempotencyKey ? { "idempotency-key": idempotencyKey } : {}),
         ...header,
       },
       data: body,
@@ -40,10 +42,15 @@ function randomIdempotencyKey() {
   return `wx-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function defaultAuthHeaders() {
-  const { operatorId, operatorName, operatorRole } = app.globalData || {};
+function defaultAuthHeaders(role) {
+  const identity = readOperatorIdentity();
+  const {
+    operatorId = identity.operatorId,
+    operatorName = identity.operatorName,
+    operatorRole = identity.role,
+  } = app.globalData || {};
   const headers = {
-    "x-user-role": operatorRole || "DRIVER",
+    "x-user-role": role || operatorRole || "DRIVER",
   };
   if (operatorId) headers["x-user-id"] = operatorId;
   if (operatorName) headers["x-user-name"] = operatorName;
@@ -52,6 +59,12 @@ function defaultAuthHeaders() {
 
 function formatError(status, data) {
   if (typeof data === "string" && data) return `${status}: ${data}`;
+  if (data && typeof data === "object") {
+    const message = Array.isArray(data.message)
+      ? data.message.join("；")
+      : data.message;
+    return `${status}: ${message || data.code || JSON.stringify(data)}`;
+  }
   return `${status}`;
 }
 

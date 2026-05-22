@@ -1,0 +1,28 @@
+<view class="page">
+  <view class="card">
+    <view class="row">
+      <view class="stack">
+        <view class="title">标准时刻表 · 图-交路</view>
+        <view class="subtle">当前运行图：{{activeScheduleLabel}}</view>
+      </view>
+      <view class="pill pill-primary">{{trips.length}} 条任务</view>
+    </view>
+  </view>
+
+  <view class="card">
+    <block wx:for="{{trips}}" wx:key="id">
+      <view class="trip-row">
+        <view class="trip-main">
+          <view class="trip-title">{{item.routeId}} · {{item.trainNo}}</view>
+          <view class="subtle">{{item.originStationId}} → {{item.terminalStationId}}</view>
+        </view>
+        <view class="stack align-right">
+          <view class="pill pill-primary">{{item.statusLabel}}</view>
+          <view class="subtle">{{item.timeRange}}</view>
+        </view>
+      </view>
+    </block>
+    <view wx:if="{{loading}}" class="empty">加载中...</view>
+    <view wx:if="{{!loading && trips.length === 0}}" class="empty">暂无运行中的交路</view>
+  </view>
+</view>

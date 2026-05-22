@@ -1,0 +1,34 @@
+<view class="page backend-page">
+  <view class="card">
+    <view class="title">后端设置</view>
+    <view class="subtle">当前：{{activeLabel}}</view>
+  </view>
+
+  <view class="preset-list">
+    <block wx:for="{{presets}}" wx:key="id">
+      <view class="preset-card {{item.active ? 'preset-active' : ''}}" data-index="{{index}}" bindtap="selectPreset">
+        <view class="preset-main">
+          <view class="preset-title">{{item.title}}</view>
+          <view class="subtle">{{item.note}}</view>
+        </view>
+        <view class="preset-status">{{item.active ? '已选' : '选择'}}</view>
+      </view>
+    </block>
+  </view>
+
+  <view class="card form-card">
+    <view class="field">
+      <view class="field-label">API 地址</view>
+      <input class="input" value="{{apiBaseUrl}}" data-field="apiBaseUrl" bindinput="onInput" placeholder="http://192.168.1.100:3000" />
+    </view>
+    <view class="field">
+      <view class="field-label">WebSocket 地址</view>
+      <input class="input" value="{{wsBaseUrl}}" data-field="wsBaseUrl" bindinput="onInput" placeholder="ws://192.168.1.100:3001" />
+    </view>
+    <view class="button-row action-row">
+      <button class="btn btn-primary" bindtap="save">保存</button>
+      <button class="btn btn-muted" bindtap="reset">恢复默认</button>
+    </view>
+  </view>
+
+</view>

@@ -5,6 +5,8 @@ class RealtimeSocket {
     this.path = path;
     this.socket = null;
     this.listeners = new Set();
+    this.openListeners = new Set();
+    this.closeListeners = new Set();
     this.rooms = new Set();
     this.opening = false;
     this.connected = false;
@@ -17,6 +19,7 @@ class RealtimeSocket {
     this.socket.onOpen(() => {
       this.opening = false;
       this.connected = true;
+      for (const listener of this.openListeners) listener();
       this.flushSubscriptions();
     });
     this.socket.onMessage((evt) => {
@@ -31,17 +34,29 @@ class RealtimeSocket {
       this.socket = null;
       this.opening = false;
       this.connected = false;
+      for (const listener of this.closeListeners) listener();
     });
     this.socket.onError(() => {
       this.socket = null;
       this.opening = false;
       this.connected = false;
+      for (const listener of this.closeListeners) listener();
     });
   }
 
   onMessage(listener) {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  onOpen(listener) {
+    this.openListeners.add(listener);
+    return () => this.openListeners.delete(listener);
+  }
+
+  onClose(listener) {
+    this.closeListeners.add(listener);
+    return () => this.closeListeners.delete(listener);
   }
 
   subscribe(rooms) {

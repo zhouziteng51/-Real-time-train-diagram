@@ -1,0 +1,136 @@
+.identity-card {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.section-copy {
+  min-width: 0;
+}
+
+.section-title {
+  color: #0f172a;
+  font-size: 30rpx;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.preset-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12rpx;
+}
+
+.preset-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4rpx;
+  min-width: 0;
+  padding: 16rpx 18rpx;
+  border: 1px solid #dbe3ef;
+  border-radius: 14rpx;
+  background: #f8fafc;
+  line-height: 1.25;
+}
+
+.preset-chip::after,
+.role-option::after {
+  border: 0;
+}
+
+.preset-chip-active {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.preset-chip-title {
+  color: #0f172a;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.preset-chip-sub {
+  color: #64748b;
+  font-size: 20rpx;
+  word-break: break-word;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.field-label {
+  color: #475569;
+  font-size: 22rpx;
+  font-weight: 600;
+}
+
+.input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 80rpx;
+  padding: 0 20rpx;
+  border: 1px solid #cbd5e1;
+  border-radius: 12rpx;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 26rpx;
+}
+
+.role-segment {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10rpx;
+}
+
+.role-option {
+  min-width: 0;
+  padding: 16rpx 12rpx;
+  border: 1px solid #cbd5e1;
+  border-radius: 12rpx;
+  background: #ffffff;
+  color: #475569;
+  font-size: 24rpx;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.role-option-active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.identity-actions {
+  margin-top: 4rpx;
+}
+
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.entry-card {
+  padding: 20rpx;
+  border: 1px solid #dbe3ef;
+  border-radius: 16rpx;
+  background: #ffffff;
+}
+
+.entry-title {
+  color: #0f172a;
+  font-size: 30rpx;
+  font-weight: 700;
+  margin-bottom: 6rpx;
+}

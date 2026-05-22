@@ -1,0 +1,44 @@
+<view class="page">
+  <view class="card">
+    <view class="row">
+      <view class="stack">
+        <view class="title">交路</view>
+        <view class="subtle">{{operatorName || '当前司机'}} · {{operatorId || '--'}}</view>
+      </view>
+      <view class="pill pill-primary">{{sourceLabel}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{currentTrip}}" class="card current-card" bindtap="openCurrentTrip">
+    <view class="subtle">当前任务</view>
+    <view class="trip-title">{{currentTrip.routeId}} · {{currentTrip.trainNo}}</view>
+    <view class="subtle">{{currentTrip.originStationId}} → {{currentTrip.terminalStationId}}</view>
+    <view class="trip-meta">
+      <view class="pill pill-green">{{trips[0].statusLabel}}</view>
+      <view class="subtle">{{trips[0].directionText}} · {{trips[0].timeRange}}</view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="row section-row">
+      <view class="title small-title">可打开的交路任务</view>
+      <view class="subtle">{{trips.length}} 条</view>
+    </view>
+    <block wx:for="{{trips}}" wx:key="id">
+      <view class="trip-row" data-id="{{item.id}}" bindtap="openTrip">
+        <view class="stack trip-main">
+          <view class="trip-name">{{item.routeId}} · {{item.trainNo}}</view>
+          <view class="subtle">{{item.stationPair}}</view>
+          <view class="subtle">{{item.directionText}} · {{item.timeRange}}</view>
+        </view>
+        <view class="stack align-right">
+          <view class="pill {{item.isCurrent ? 'pill-green' : 'pill-gray'}}">{{item.statusLabel}}</view>
+          <view wx:if="{{item.isCurrent}}" class="subtle">当前班</view>
+        </view>
+      </view>
+    </block>
+    <view wx:if="{{loading}}" class="empty">加载中...</view>
+    <view wx:if="{{errorLabel}}" class="empty error">交路任务读取失败：{{errorLabel}}</view>
+    <view wx:if="{{!loading && !errorLabel && trips.length === 0}}" class="empty">暂无可打开的交路任务</view>
+  </view>
+</view>

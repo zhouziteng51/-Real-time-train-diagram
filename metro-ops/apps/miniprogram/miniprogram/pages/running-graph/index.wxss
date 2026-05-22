@@ -1,0 +1,65 @@
+.table-head,
+.table-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  border-top: 1px solid #dbe3ef;
+}
+
+.table-head {
+  padding: 16rpx 0 12rpx;
+  color: #64748b;
+  font-size: 22rpx;
+  font-weight: 600;
+}
+
+.table-row {
+  padding: 16rpx 0;
+  font-size: 24rpx;
+}
+
+.table-head:first-child,
+.table-row:first-of-type {
+  border-top: 0;
+}
+
+.cell {
+  min-width: 0;
+  word-break: break-word;
+}
+
+.train {
+  flex: 1.2;
+}
+
+.route {
+  flex: 0.8;
+}
+
+.status {
+  flex: 0.8;
+}
+
+.speed,
+.delay {
+  flex: 0.8;
+}
+
+.updated {
+  flex: 1.3;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.mono-bold {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+}
+
+.empty {
+  padding: 28rpx 0 12rpx;
+  color: #64748b;
+  font-size: 24rpx;
+}

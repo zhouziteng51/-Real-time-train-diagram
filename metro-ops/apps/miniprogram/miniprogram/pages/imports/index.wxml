@@ -1,0 +1,27 @@
+<view class="page">
+  <view class="card">
+    <view class="title">导入中心</view>
+    <view class="subtle">小程序可查看历史导入状态、预览、告警和复核信息。</view>
+  </view>
+
+  <view class="card">
+    <block wx:for="{{jobs}}" wx:key="id">
+      <view class="job-row" data-id="{{item.id}}" bindtap="openJob">
+        <view class="job-main">
+          <view class="job-title">{{item.fileName}}</view>
+          <view class="subtle">{{item.sourceTypeLabel}} · {{item.parserName || '等待解析'}}</view>
+          <view wx:if="{{item.confidenceSummary}}" class="meta-line">
+            {{item.confidenceSummary}} · {{item.confidenceText}}
+          </view>
+        </view>
+        <view class="job-side">
+          <view class="pill pill-primary">{{item.statusLabel}}</view>
+          <view class="subtle">查看详情</view>
+        </view>
+      </view>
+    </block>
+    <view wx:if="{{loading}}" class="empty">加载中...</view>
+    <view wx:if="{{errorLabel}}" class="empty error">导入列表读取失败：{{errorLabel}}</view>
+    <view wx:if="{{!loading && !errorLabel && jobs.length === 0}}" class="empty">暂无导入任务</view>
+  </view>
+</view>

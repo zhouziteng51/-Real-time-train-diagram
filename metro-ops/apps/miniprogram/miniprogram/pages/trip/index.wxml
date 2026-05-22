@@ -1,28 +1,108 @@
 <view class="page">
-  <view wx:if="{{trip}}" class="card">
-    <view class="row">
-      <view class="stack">
-        <view class="title">{{trip.trainNo}} · {{trip.routeId}}</view>
-        <view class="subtle">{{trip.originStationId}} → {{trip.terminalStationId}}</view>
+  <view wx:if="{{trip}}" class="task-card">
+    <view class="task-header">
+      <view class="task-title-block">
+        <view class="task-title">当前任务 · {{directionText}}单程</view>
+        <view class="task-sub">{{trip.routeId}} · {{trip.trainNo}}</view>
       </view>
       <view class="pill {{statusClass}}">{{tripStatus}}</view>
     </view>
-    <view class="subtle" style="margin-top: 16rpx;">计划 {{departureTime}} - {{arrivalTime}}</view>
+    <view class="progress-track">
+      <view class="progress-bar" style="width: {{progressWidth}};"></view>
+    </view>
+    <view class="task-times">
+      <text>始发: {{departureTime}}</text>
+      <text>预计: {{arrivalTime}}</text>
+    </view>
   </view>
 
-  <view wx:if="{{trip}}" class="card">
-    <view class="title">事件流</view>
+  <view wx:if="{{trip && currentDuty}}" class="task-card">
+    <view class="duty-header">
+      <view>
+        <view class="panel-title">当前值乘</view>
+        <view class="panel-sub">{{dutySummaryLabel}}</view>
+      </view>
+      <view class="status-line">
+        <view class="pill pill-green">{{runtimeStatusLabel}}</view>
+        <view class="pill pill-primary">{{locationKindLabel}}</view>
+      </view>
+    </view>
+    <view class="info-grid">
+      <view class="info-cell">
+        <view class="info-label">所在位置</view>
+        <view class="info-value">{{locationText}}</view>
+      </view>
+      <view class="info-cell">
+        <view class="info-label">上下行</view>
+        <view class="info-value">{{directionText}}</view>
+      </view>
+      <view class="info-cell">
+        <view class="info-label">区间</view>
+        <view class="info-value">{{stationPair}}</view>
+      </view>
+      <view class="info-cell">
+        <view class="info-label">计划时间</view>
+        <view class="info-value">{{dutyTimeRange}}</view>
+      </view>
+      <view class="info-cell wide">
+        <view class="info-label">时刻表来源</view>
+        <view class="info-value">{{scheduleSource}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{trip}}" class="task-card">
+    <view class="panel-title">司机操作</view>
+    <view class="panel-sub">{{operationHint}}</view>
+    <view class="button-row trip-actions">
+      <button
+        class="btn btn-primary action-btn"
+        hover-class="btn-hover"
+        bindtap="startTrip"
+        disabled="{{startDisabled || actionBusy}}"
+        loading="{{actionBusy && actionBusyType === 'start'}}"
+      >
+        开始值乘
+      </button>
+      <button
+        class="btn btn-muted action-btn"
+        hover-class="btn-hover"
+        bindtap="arriveTerminal"
+        disabled="{{arriveDisabled || actionBusy}}"
+        loading="{{actionBusy && actionBusyType === 'arrive'}}"
+      >
+        标记终到
+      </button>
+      <button
+        class="btn btn-secondary action-btn"
+        hover-class="btn-hover"
+        bindtap="archiveTrip"
+        disabled="{{archiveDisabled || actionBusy}}"
+        loading="{{actionBusy && actionBusyType === 'archive'}}"
+      >
+        归档
+      </button>
+    </view>
+  </view>
+
+  <view wx:if="{{trip && !currentDuty}}" class="task-card">
+    <view class="panel-title">当前值乘</view>
+    <view class="panel-sub">暂无匹配到的值乘任务</view>
+  </view>
+
+  <view wx:if="{{trip}}" class="task-card">
+    <view class="panel-title">事件流</view>
     <block wx:for="{{events}}" wx:key="id">
       <view class="event-row">
-        <view class="subtle">{{item.occurredAtTime}}</view>
-        <view>{{item.kind}}</view>
-        <view class="subtle">{{item.fromStatus}} → {{item.toStatus}}</view>
+        <view class="event-time">{{item.occurredAtTime}}</view>
+        <view class="event-main">{{item.kindLabel}}</view>
+        <view class="event-sub">{{item.fromStatusLabel}} → {{item.toStatusLabel}}</view>
       </view>
     </block>
-    <view wx:if="{{events.length === 0}}" class="subtle">暂无事件</view>
+    <view wx:if="{{events.length === 0}}" class="panel-sub">暂无事件</view>
   </view>
 
-  <view wx:if="{{!trip}}" class="card">
-    <view class="subtle">未找到任务</view>
+  <view wx:if="{{!trip}}" class="task-card">
+    <view class="panel-sub">未找到任务</view>
   </view>
 </view>

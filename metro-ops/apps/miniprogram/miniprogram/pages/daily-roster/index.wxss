@@ -1,0 +1,28 @@
+.trip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 18rpx 0;
+  border-top: 1px solid #e2e8f0;
+}
+
+.trip-row:first-of-type {
+  border-top: 0;
+}
+
+.trip-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.trip-title {
+  color: #0f172a;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.empty {
+  padding-top: 18rpx;
+  color: #64748b;
+  font-size: 24rpx;
+}
