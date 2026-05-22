@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { RealtimeVehicleStatus } from "@metro-ops/shared";
 import { apiFetch } from "../api/client.js";
@@ -20,9 +20,6 @@ import {
 } from "../runtime/duties.js";
 
 export function DashboardPage() {
-  const [manualRuntime, setManualRuntime] =
-    useState<CurrentDutiesResponse>();
-  const [manualError, setManualError] = useState<Error>();
   const setActiveScheduleVersion = useAppStore(
     (s) => s.setActiveScheduleVersion,
   );
@@ -30,43 +27,28 @@ export function DashboardPage() {
     queryKey: ["runtime", "duties"],
     queryFn: () => apiFetch<CurrentDutiesResponse>("/api/runtime/duties"),
     refetchInterval: 1000,
+    refetchIntervalInBackground: true,
+    refetchOnMount: "always",
+    retry: false,
   });
 
-  useEffect(() => {
-    let disposed = false;
-    const load = async () => {
-      try {
-        const data = await apiFetch<CurrentDutiesResponse>(
-          "/api/runtime/duties",
-        );
-        if (disposed) return;
-        setManualRuntime(data);
-        setManualError(undefined);
-      } catch (error) {
-        if (disposed) return;
-        setManualError(error instanceof Error ? error : new Error(String(error)));
-      }
-    };
-    void load();
-    const timer = window.setInterval(load, 1000);
-    return () => {
-      disposed = true;
-      window.clearInterval(timer);
-    };
-  }, []);
-
-  const data = runtime.data ?? manualRuntime;
+  const data = runtime.data;
   const duties = data?.duties ?? [];
   const currentTime = data?.currentTime;
   const activeSchedule = data?.activeSchedule;
   const runtimeError =
-    runtime.error instanceof Error ? runtime.error : manualError;
+    runtime.error instanceof Error
+      ? runtime.error
+      : runtime.error
+        ? new Error(String(runtime.error))
+        : undefined;
   const runningCount = duties.filter(
     (duty) => duty.status === "RUNNING",
   ).length;
   const dwellingCount = duties.filter(
     (duty) => duty.status === "DWELLING",
   ).length;
+  const visibleDuties = duties;
 
   useEffect(() => {
     setActiveScheduleVersion(activeSchedule?.scheduleVersionId);
@@ -75,7 +57,7 @@ export function DashboardPage() {
   return (
     <div className="p-margin-mobile md:p-lg max-w-7xl mx-auto space-y-md">
       <section className="grid grid-cols-3 gap-sm">
-        <MetricCard label="当前值乘" value={duties.length} />
+        <MetricCard label="正在执行车次" value={visibleDuties.length} />
         <MetricCard label="区间运行" value={runningCount} tone="ok" />
         <MetricCard label="停站" value={dwellingCount} />
       </section>
@@ -118,16 +100,18 @@ export function DashboardPage() {
               </tr>
             </thead>
             <tbody>
-              {duties.map((duty) => (
+              {visibleDuties.map((duty) => (
                 <tr
-                  key={`${duty.operatorId}-${duty.trainNo}`}
+                  key={`${duty.scheduleVersionId}-${duty.trainNo}`}
                   className="border-t border-outline-variant"
                 >
                   <td className="p-sm min-w-[112px]">
                     <DutyRouteBadge duty={duty} />
                   </td>
                   <td className="p-sm">
-                    <div className="font-semibold">{duty.operatorName}</div>
+                    <div className="font-semibold">
+                      {duty.operatorName || "\u00A0"}
+                    </div>
                   </td>
                   <td className="p-sm">
                     <div className="font-mono font-bold">{duty.trainNo}</div>
@@ -159,20 +143,20 @@ export function DashboardPage() {
                   </td>
                 </tr>
               ))}
-              {(runtime.isError || (!data && manualError)) && (
+              {runtime.isError && (
                 <tr>
                   <td colSpan={8} className="p-md text-center text-red-700">
                     实时数据读取失败：{runtimeError?.message ?? "未知错误"}
                   </td>
                 </tr>
               )}
-              {!runtime.isError && !manualError && duties.length === 0 && (
+              {!runtime.isError && visibleDuties.length === 0 && (
                 <tr>
                   <td
                     colSpan={8}
                     className="p-md text-center text-on-surface-variant"
                   >
-                    当前时间没有匹配到正在运行的真实车次
+                    当前时间没有正在执行的车次
                   </td>
                 </tr>
               )}

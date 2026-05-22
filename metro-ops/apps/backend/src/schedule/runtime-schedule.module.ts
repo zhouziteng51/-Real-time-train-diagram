@@ -18,6 +18,7 @@ interface CurrentDutiesResponse {
   currentTime: CurrentTimeResponse;
   activeSchedule: ActiveOperatingSchedule;
   duties: LiveTrainDuty[];
+  allDuties: LiveTrainDuty[];
 }
 
 @Controller("api/runtime")
@@ -39,6 +40,7 @@ export class RuntimeScheduleController {
       currentTime: currentShanghaiTime(now),
       activeSchedule: this.runtimeSchedule.getActiveOperatingSchedule(now),
       duties: this.runtimeSchedule.listLiveDuties(now),
+      allDuties: this.runtimeSchedule.listAllScheduleDuties(now),
     };
   }
 }

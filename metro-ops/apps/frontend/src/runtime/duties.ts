@@ -53,6 +53,7 @@ export interface CurrentDutiesResponse {
   currentTime: CurrentTimeResponse;
   activeSchedule: ActiveOperatingSchedule;
   duties: LiveTrainDuty[];
+  allDuties?: LiveTrainDuty[] | undefined;
 }
 
 export function findDutyForOperator(

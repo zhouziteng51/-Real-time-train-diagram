@@ -168,52 +168,57 @@ export class RuntimeScheduleService implements OnModuleInit {
       (duty) => !duty.dutyDate || duty.dutyDate === dutyDate,
     );
     const hasImportedDutyAssignments = duties.length > 0;
-    const activeTrains = snapshot.trains
+    const liveTrains = snapshot.trains
       .map((train) => ({ train, position: calculateTrainPosition(train, now) }))
       .filter(
         ({ position }) =>
-          position.locationKind !== "NOT_STARTED" &&
-          position.locationKind !== "FINISHED",
+          position.locationKind === "AT_STATION" ||
+          position.locationKind === "BETWEEN_STATIONS",
       )
-      .sort(
-        (a, b) =>
-          clockTimeToSeconds(a.position.plannedDepartureTime ?? "23:59:59") -
-            clockTimeToSeconds(b.position.plannedDepartureTime ?? "23:59:59") ||
-          a.train.trainNo.localeCompare(b.train.trainNo),
-      );
-
-    return activeTrains
-      .slice(
-        0,
-        hasImportedDutyAssignments ? activeTrains.length : DEMO_OPERATORS.length,
-      )
-      .map(({ train, position }, index) => {
-        const duty = findMatchingDuty(duties, train);
-        const dutyRoute = routeForDuty(duty, train);
-        const operator = operatorForDuty(
-          duty,
-          index,
-          hasImportedDutyAssignments,
-          train.trainNo,
+      .sort((a, b) => {
+        const leftClock = clockTimeToSeconds(
+          a.position.plannedDepartureTime ?? "23:59:59",
         );
-        return {
-          dutyRouteNo: dutyRoute.routeNo,
-          dutyRouteId: dutyRoute.routeId,
-          dutyShiftName: dutyRoute.shiftName,
-          operatorId: operator.operatorId,
-          operatorName: operator.operatorName,
-          trainNo: train.trainNo,
-          routeId: train.routeId,
-          scheduleVersionId: train.scheduleVersionId,
-          scheduleVersionName: train.scheduleVersionName,
-          direction: inferDirectionFromStations(train.stations) ?? train.direction,
-          ...position,
-          delaySeconds: 0,
-          status:
-            position.locationKind === "AT_STATION" ? "DWELLING" : "RUNNING",
-          calculatedAt: now.toISOString(),
-        };
+        const rightClock = clockTimeToSeconds(
+          b.position.plannedDepartureTime ?? "23:59:59",
+        );
+        if (leftClock !== rightClock) return leftClock - rightClock;
+        return a.train.trainNo.localeCompare(b.train.trainNo);
       });
+
+    return liveTrains.map(({ train, position }, index) => {
+      return buildTrainDuty(train, position, duties, now, index, {
+        hasImportedDutyAssignments,
+        useDemoFallbackOperator: true,
+      });
+    });
+  }
+
+  listAllScheduleDuties(now = new Date()): LiveTrainDuty[] {
+    const snapshot = this.resolveOperatingSchedule(now);
+    const dutyDate = shanghaiLocalDate(now);
+    const duties = snapshot.duties.filter(
+      (duty) => !duty.dutyDate || duty.dutyDate === dutyDate,
+    );
+
+    return snapshot.trains
+      .map((train) => ({ train, position: calculateTrainPosition(train, now) }))
+      .sort((a, b) => {
+        const leftClock = clockTimeToSeconds(
+          a.position.plannedDepartureTime ?? "23:59:59",
+        );
+        const rightClock = clockTimeToSeconds(
+          b.position.plannedDepartureTime ?? "23:59:59",
+        );
+        if (leftClock !== rightClock) return leftClock - rightClock;
+        return a.train.trainNo.localeCompare(b.train.trainNo);
+      })
+      .map(({ train, position }, index) =>
+        buildTrainDuty(train, position, duties, now, index, {
+          hasImportedDutyAssignments: duties.length > 0,
+          useDemoFallbackOperator: false,
+        }),
+      );
   }
 
   private resolveOperatingSchedule(now: Date): {
@@ -471,6 +476,53 @@ function calculateTrainPosition(
   };
 }
 
+function buildTrainDuty(
+  train: StoredTrain,
+  position: ReturnType<typeof calculateTrainPosition>,
+  duties: DutyDoc[],
+  now: Date,
+  fallbackIndex: number,
+  options: {
+    hasImportedDutyAssignments: boolean;
+    useDemoFallbackOperator: boolean;
+  },
+): LiveTrainDuty {
+  const duty = findMatchingDuty(duties, train);
+  const dutyRoute = routeForDuty(duty, train);
+  const operator = operatorForDuty(
+    duty,
+    fallbackIndex,
+    options.hasImportedDutyAssignments,
+    train.trainNo,
+    options.useDemoFallbackOperator,
+  );
+
+  return {
+    dutyRouteNo: dutyRoute.routeNo,
+    dutyRouteId: dutyRoute.routeId,
+    dutyShiftName: dutyRoute.shiftName,
+    operatorId: operator.operatorId,
+    operatorName: operator.operatorName,
+    trainNo: train.trainNo,
+    routeId: train.routeId,
+    scheduleVersionId: train.scheduleVersionId,
+    scheduleVersionName: train.scheduleVersionName,
+    direction: inferDirectionFromStations(train.stations) ?? train.direction,
+    ...position,
+    delaySeconds: 0,
+    status: statusForPosition(position.locationKind),
+    calculatedAt: now.toISOString(),
+  };
+}
+
+function statusForPosition(
+  locationKind: LiveTrainDuty["locationKind"],
+): LiveTrainDuty["status"] {
+  if (locationKind === "AT_STATION") return "DWELLING";
+  if (locationKind === "BETWEEN_STATIONS") return "RUNNING";
+  return "STOPPED";
+}
+
 function secondsSinceShanghaiMidnight(date: Date): number {
   const formatter = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Shanghai",
@@ -587,8 +639,16 @@ function operatorForDuty(
   fallbackIndex: number,
   hasImportedDutyAssignments: boolean,
   trainNo: string,
+  useDemoFallbackOperator: boolean,
 ): { operatorId: string; operatorName: string } {
-  if (!duty?.operatorName) {
+  const operatorName = realOperatorName(duty);
+  if (!operatorName) {
+    if (!useDemoFallbackOperator) {
+      return {
+        operatorId: "",
+        operatorName: "",
+      };
+    }
     if (hasImportedDutyAssignments) {
       return {
         operatorId: `unassigned-${trainNo}`,
@@ -603,13 +663,20 @@ function operatorForDuty(
   }
 
   const known = DEMO_OPERATORS.find(
-    (operator) => operator.operatorName === duty.operatorName,
+    (operator) => operator.operatorName === operatorName,
   );
   return {
-    operatorId:
-      known?.operatorId ?? `op-import-${shortHash(duty.operatorName)}`,
-    operatorName: duty.operatorName,
+    operatorId: known?.operatorId ?? `op-import-${shortHash(operatorName)}`,
+    operatorName,
   };
+}
+
+function realOperatorName(duty: DutyDoc | undefined): string | undefined {
+  const operatorName = duty?.operatorName?.trim();
+  if (!operatorName) return undefined;
+  if (duty?.notes?.includes("人员来源:系统生成占位")) return undefined;
+  if (/^(早|白|夜)班\d{2}$/.test(operatorName)) return undefined;
+  return operatorName;
 }
 
 function routeForDuty(

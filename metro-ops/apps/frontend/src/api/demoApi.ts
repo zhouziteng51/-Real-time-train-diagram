@@ -82,6 +82,7 @@ export async function demoApiFetch<T>(
       currentTime: currentShanghaiTime(),
       activeSchedule,
       duties: buildDemoDuties(),
+      allDuties: buildDemoAllDuties(),
     } as T;
   }
 
@@ -355,6 +356,53 @@ function buildDemoDuties() {
       plannedDepartureTime: clockAtOffset(-42),
       plannedArrivalTime: clockAtOffset(4),
       calculatedAt: now,
+    },
+  ];
+}
+
+function buildDemoAllDuties() {
+  const base = buildDemoDuties();
+  return [
+    ...base,
+    {
+      operatorId: "",
+      operatorName: "",
+      dutyRouteNo: "晚4",
+      dutyRouteId: "demo-static-2026-晚4",
+      dutyShiftName: "夜班",
+      trainNo: "G6005",
+      routeId: "R-1056",
+      scheduleVersionId: DEMO_SCHEDULE_VERSION_ID,
+      scheduleVersionName: activeSchedule.scheduleVersionName,
+      direction: "UP",
+      location: "铜山中医院站待发",
+      locationKind: "NOT_STARTED",
+      nextStationName: "铜山中医院站",
+      delaySeconds: 0,
+      status: "STOPPED",
+      plannedDepartureTime: clockAtOffset(52),
+      plannedArrivalTime: clockAtOffset(98),
+      calculatedAt: new Date().toISOString(),
+    },
+    {
+      operatorId: "",
+      operatorName: "",
+      dutyRouteNo: "晚5",
+      dutyRouteId: "demo-static-2026-晚5",
+      dutyShiftName: "夜班",
+      trainNo: "Z6003",
+      routeId: "R-1048",
+      scheduleVersionId: DEMO_SCHEDULE_VERSION_ID,
+      scheduleVersionName: activeSchedule.scheduleVersionName,
+      direction: "DOWN",
+      location: "徐州东站已终到",
+      locationKind: "FINISHED",
+      previousStationName: "徐州东站",
+      delaySeconds: 0,
+      status: "STOPPED",
+      plannedDepartureTime: clockAtOffset(-96),
+      plannedArrivalTime: clockAtOffset(-52),
+      calculatedAt: new Date().toISOString(),
     },
   ];
 }
