@@ -73,6 +73,7 @@ export class TripController {
   }
 
   @Post(":tripId/start")
+  @Roles("DRIVER")
   @HttpCode(200)
   start(@Param("tripId") tripId: string, @Body() body: unknown) {
     const parsed = StartTripBodySchema.safeParse(body ?? {});
@@ -88,6 +89,7 @@ export class TripController {
   }
 
   @Post(":tripId/arrive-terminal")
+  @Roles("DRIVER")
   @HttpCode(200)
   arrive(@Param("tripId") tripId: string, @Body() body: unknown) {
     const parsed = ArriveTerminalBodySchema.safeParse(body ?? {});
@@ -101,7 +103,7 @@ export class TripController {
   }
 
   @Post(":tripId/archive")
-  @Roles("DISPATCHER")
+  @Roles("DRIVER")
   @HttpCode(200)
   archive(@Param("tripId") tripId: string, @Body() body: unknown) {
     const parsed = ArchiveTripBodySchema.safeParse(body);

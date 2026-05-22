@@ -146,7 +146,7 @@ test("history query restores imported trips from postgres", async () => {
   });
   const store = new TripStore(postgres);
 
-  await store.onModuleInit();
+  await store.whenPostgresRestored();
 
   const byOperator = store.queryHistory({
     scheduleVersionId: "Z6001",
@@ -159,14 +159,35 @@ test("history query restores imported trips from postgres", async () => {
   assert.equal(store.listImportedTrains("Z6001")[0]?.data.stations.length, 2);
 });
 
+test("postgres restore can complete without blocking module init", async () => {
+  const ready = deferred();
+  const postgres = fakePostgres({
+    versions: [],
+    duties: [],
+    trips: [],
+    events: [],
+    whenReady: () => ready.promise,
+  });
+  const store = new TripStore(postgres);
+
+  void store.onModuleInit();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(ready.settled, false);
+  ready.resolve();
+  await store.whenPostgresRestored();
+  assert.equal(ready.settled, false);
+});
+
 function fakePostgres(data: {
   versions: StoredScheduleVersion[];
   duties: Awaited<ReturnType<PostgresService["loadDuties"]>>;
   trips: Awaited<ReturnType<PostgresService["loadTrips"]>>;
   events: TripEvent[];
+  whenReady?: () => Promise<void>;
 }): PostgresService {
   return {
     isEnabled: () => true,
+    whenReady: data.whenReady ?? (async () => undefined),
     loadScheduleVersions: async () => data.versions,
     loadDuties: async () => data.duties,
     loadTrips: async () => data.trips,
@@ -176,4 +197,20 @@ function fakePostgres(data: {
     upsertScheduleVersion: async (_version: StoredScheduleVersion) => undefined,
     upsertDuty: async () => undefined,
   } as unknown as PostgresService;
+}
+
+function deferred(): {
+  promise: Promise<void>;
+  resolve: () => void;
+  settled: boolean;
+} {
+  let resolve!: () => void;
+  let settled = false;
+  const promise = new Promise<void>((done) => {
+    resolve = () => {
+      settled = true;
+      done();
+    };
+  });
+  return { promise, resolve, settled };
 }

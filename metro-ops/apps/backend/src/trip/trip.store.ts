@@ -83,6 +83,8 @@ export class TripStore implements OnModuleInit {
   >();
   private readonly importedVersions = new Map<string, StoredScheduleVersion>();
   private latestImportedScheduleVersionId: string | undefined;
+  private postgresRestorePromise: Promise<void> | undefined;
+  private postgresRestoreCompleted = false;
 
   constructor(
     @Optional()
@@ -93,8 +95,16 @@ export class TripStore implements OnModuleInit {
   }
 
   async onModuleInit(): Promise<void> {
-    if (!this.postgres?.isEnabled()) return;
-    await this.restoreFromPostgres();
+    void this.bootstrapPostgresRestore();
+  }
+
+  async whenPostgresRestored(): Promise<void> {
+    if (!this.postgres) return;
+    if (this.postgresRestoreCompleted) return;
+    if (!this.postgresRestorePromise) {
+      this.postgresRestorePromise = this.restorePostgresSnapshot();
+    }
+    await this.postgresRestorePromise;
   }
 
   list(): StoredTripTask[] {
@@ -611,6 +621,25 @@ export class TripStore implements OnModuleInit {
     }
 
     this.events.splice(0, this.events.length, ...events);
+  }
+
+  private async bootstrapPostgresRestore(): Promise<void> {
+    try {
+      await this.whenPostgresRestored();
+    } catch {
+      // Keep startup resilient; runtime queries can still fall back to demo data.
+    }
+  }
+
+  private async restorePostgresSnapshot(): Promise<void> {
+    await this.postgres?.whenReady();
+    if (!this.postgres?.isEnabled()) return;
+    try {
+      await this.restoreFromPostgres();
+      this.postgresRestoreCompleted = true;
+    } finally {
+      this.postgresRestorePromise = undefined;
+    }
   }
 
   private restoreImportedTrain(
