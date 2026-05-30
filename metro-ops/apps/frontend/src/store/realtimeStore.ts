@@ -16,7 +16,7 @@ export const useRealtimeStore = create<RealtimeStoreState>((set) => ({
   vehiclesById: {},
   setConnectionStatus: (status) => set({ connectionStatus: status }),
   replaceVehicles: (items, sentAt) =>
-    set((state) => {
+    set((_state) => {
       const next: Record<string, RealtimeVehicleState> = {};
       for (const v of items) next[v.vehicleId] = v;
       return { vehiclesById: next, lastSyncAt: sentAt };

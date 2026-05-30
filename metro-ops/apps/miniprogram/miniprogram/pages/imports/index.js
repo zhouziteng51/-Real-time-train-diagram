@@ -2,7 +2,6 @@ const { apiRequest } = require("../../utils/api");
 const {
   importStatusLabel,
   importSourceTypeLabel,
-  importConfidenceLabel,
 } = require("../../utils/format");
 const { onOperatorIdentityChanged } = require("../../utils/operatorIdentity");
 

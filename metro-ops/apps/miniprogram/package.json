@@ -5,6 +5,8 @@
   "description": "Metro Ops Control 微信小程序客户端",
   "scripts": {
     "build": "node -e \"console.log('Mini program is built by WeChat DevTools')\"",
+    "lint": "eslint miniprogram --ext .js",
+    "test": "node --test \"miniprogram/**/*.test.js\"",
     "typecheck": "node -e \"console.log('Mini program uses native WeChat JS')\"",
     "check": "node -e \"console.log('Use WeChat DevTools to run the mini program')\""
   }

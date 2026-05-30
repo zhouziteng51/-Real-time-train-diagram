@@ -12,7 +12,6 @@ import { test } from "node:test";
 import { ImportStore } from "../import.store.js";
 import { ImportDomainService } from "../import.service.js";
 import type { RealtimeGateway } from "../../realtime/realtime.gateway.js";
-import type { ObjectStorageService } from "../../storage/object-storage.service.js";
 import type { ParserFactory } from "../parsers/parser.factory.js";
 import type { PostgresService } from "../../persistence/postgres.service.js";
 import type { TripStore } from "../../trip/trip.store.js";

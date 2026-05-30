@@ -30,6 +30,17 @@ pnpm dev:backend        # 3000
 pnpm dev:frontend       # 5173
 ```
 
+## 本地检查
+
+```bash
+pnpm run ci                 # lint + typecheck + full test
+pnpm run daily:local        # 本地日报同款全量检查
+pnpm run ci:restricted      # 受限自动化:跳过 @metro-ops/shared tests
+pnpm run daily:automation   # 受限日报自动化同款检查
+```
+
+后端测试使用 `node --import tsx --test`,避免受限环境触发 `tsx --test` 的 IPC 权限问题。`@metro-ops/shared` 当前仍用 `tsx --test`,2026-05-25 在开发机执行 `pnpm -r test` 已通过。若受限自动化环境因 tsx IPC 报 `EPERM`,自动化使用 `ci:restricted` / `daily:automation`,同时保持开发机或普通 CI 跑 `pnpm run ci` 覆盖 shared;如果要在受限环境恢复 shared tests,先把 shared runner 换到 `node --test` + loader/预编译,或固化 tsx 的无 IPC 参数。
+
 本地前端默认通过 Vite 代理访问 `http://localhost:3000` 的 `/api` 和 `/ws`。如果后端 WebSocket 单独开端口,可临时设置:
 
 ```bash

@@ -29,13 +29,12 @@ export class RuntimeScheduleController {
   ) {}
 
   @Get("time")
-  time(): CurrentTimeResponse {
-    return currentShanghaiTime();
+  time(date = new Date()): CurrentTimeResponse {
+    return currentShanghaiTime(date);
   }
 
   @Get("duties")
-  duties(): CurrentDutiesResponse {
-    const now = new Date();
+  duties(now = new Date()): CurrentDutiesResponse {
     return {
       currentTime: currentShanghaiTime(now),
       activeSchedule: this.runtimeSchedule.getActiveOperatingSchedule(now),

@@ -1,4 +1,4 @@
-const { apiRequest } = require("./api");
+const api = require("./api");
 const { buildRuntimeSummary, findDutyForOperator } = require("./duty");
 const {
   directionLabel,
@@ -11,9 +11,12 @@ const {
 } = require("./format");
 
 async function loadRuntimeDashboard(operator) {
-  const runtime = await apiRequest("/api/runtime/duties");
-  const rawDuties = Array.isArray(runtime?.duties) ? runtime.duties : [];
-  const currentDuty = findDutyForOperator(rawDuties, operator);
+  const runtime = await api.apiRequest("/api/runtime/duties");
+  const liveDuties = Array.isArray(runtime?.duties) ? runtime.duties : [];
+  const rawDuties = Array.isArray(runtime?.allDuties)
+    ? runtime.allDuties
+    : liveDuties;
+  const currentDuty = findDutyForOperator(liveDuties, operator);
   const duties = rawDuties.map((duty) => decorateDuty(duty, currentDuty));
 
   return {
