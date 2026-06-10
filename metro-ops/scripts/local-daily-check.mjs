@@ -1,20 +1,13 @@
 import { spawn } from "node:child_process";
 
-const restrictedAutomation = process.argv.includes("--restricted-automation");
-
 const checks = [
   ["lint", ["pnpm", "lint"]],
   ["typecheck", ["pnpm", "typecheck"]],
-  ["test", ["pnpm", restrictedAutomation ? "test:automation" : "test"]],
+  ["test", ["pnpm", "test"]],
 ];
 
 const startedAt = new Date();
 console.log(`Metro Ops local daily check started at ${startedAt.toISOString()}`);
-if (restrictedAutomation) {
-  console.log(
-    "Restricted automation mode: skipping @metro-ops/shared tests; run them on a developer machine or move them off tsx before enabling here.",
-  );
-}
 
 for (const [name, command] of checks) {
   console.log(`\n== ${name} ==`);

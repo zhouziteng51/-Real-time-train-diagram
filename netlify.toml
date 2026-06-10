@@ -1,13 +1,13 @@
 [build]
-  base = "metro-ops"
-  command = "pnpm --filter @metro-ops/shared build && pnpm --filter @metro-ops/frontend build"
-  publish = "apps/frontend/dist"
+base = "metro-ops"
+command = "corepack enable && corepack prepare pnpm@9.0.0 --activate && pnpm install --frozen-lockfile && pnpm --filter @metro-ops/shared build && pnpm --filter @metro-ops/frontend build"
+publish = "apps/frontend/dist"
 
 [build.environment]
-  NODE_VERSION = "22"
-  PNPM_VERSION = "9.0.0"
+NODE_VERSION = "22"
+PNPM_VERSION = "9.0.0"
 
 [[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+from = "/*"
+to = "/index.html"
+status = 200

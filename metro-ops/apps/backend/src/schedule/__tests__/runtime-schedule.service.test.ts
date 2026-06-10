@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { test } from "node:test";
 import type { NormalizedImportDocument } from "@metro-ops/shared";
 import { PdfOcrHybridParser } from "../../import/parsers/normalize.js";
@@ -78,6 +81,54 @@ test("all schedule duties hides generated placeholder operator names", () => {
 
   assert.equal(allDuties.length, 1);
   assert.equal(allDuties[0]?.operatorName, "");
+});
+
+test("default PDF loader supports configured bundled PDF directory", async () => {
+  const pdfDir = await mkdtemp(join(tmpdir(), "metro-ops-runtime-pdfs-"));
+  const previousEnv = saveDefaultPdfEnv();
+  const seenFileNames: string[] = [];
+  const store = new TripStore();
+  const parser = {
+    async extract(
+      _buffer: Buffer,
+      ctx: { fileName: string },
+    ): Promise<NormalizedImportDocument> {
+      seenFileNames.push(ctx.fileName);
+      return buildDefaultPdfSchedule(ctx.fileName);
+    },
+  } as PdfOcrHybridParser;
+
+  try {
+    await writeFile(join(pdfDir, "G6001时刻表.pdf"), "g6001");
+    await writeFile(join(pdfDir, "Z6001时刻表.pdf"), "z6001");
+    delete process.env.METRO_OPS_G6001_PDF_PATH;
+    delete process.env.METRO_OPS_Z6001_PDF_PATH;
+    process.env.METRO_OPS_DEFAULT_SCHEDULE_PDF_DIR = pdfDir;
+
+    const runtime = new RuntimeScheduleService(store, parser);
+    await runtime.onModuleInit();
+
+    assert.deepEqual(seenFileNames.sort(), [
+      "G6001时刻表.pdf",
+      "Z6001时刻表.pdf",
+    ]);
+    assert.equal(
+      store.getImportedScheduleVersion("G6001")?.sourceFileName,
+      "G6001时刻表.pdf",
+    );
+    assert.equal(
+      store.getImportedScheduleVersion("Z6001")?.sourceFileName,
+      "Z6001时刻表.pdf",
+    );
+    assert.equal(
+      runtime.getActiveOperatingSchedule(new Date("2026-05-21T11:00:00.000Z"))
+        .source,
+      "IMPORTED",
+    );
+  } finally {
+    restoreDefaultPdfEnv(previousEnv);
+    await rm(pdfDir, { recursive: true, force: true });
+  }
 });
 
 function buildScheduleWithLiveTrains(
@@ -194,4 +245,41 @@ function buildGeneratedNameSchedule(): NormalizedImportDocument {
     warnings: [],
     rawBlocks: [],
   };
+}
+
+function buildDefaultPdfSchedule(fileName: string): NormalizedImportDocument {
+  return {
+    meta: {
+      sourceType: "PDF",
+      parserName: "test-runtime-default-pdf",
+      fileName,
+      scheduleVersionName: "placeholder",
+      extractedAt: "2026-05-21T00:00:00.000Z",
+      confidence: { trains: 1, segments: 1, duties: 1 },
+    },
+    trains: [buildTrain("94001", "18:00:00", "19:00:00")],
+    circulationSegments: [],
+    dutyAssignments: [],
+    warnings: [],
+    rawBlocks: [],
+  };
+}
+
+function saveDefaultPdfEnv(): Record<string, string | undefined> {
+  return {
+    METRO_OPS_DEFAULT_SCHEDULE_PDF_DIR:
+      process.env.METRO_OPS_DEFAULT_SCHEDULE_PDF_DIR,
+    METRO_OPS_G6001_PDF_PATH: process.env.METRO_OPS_G6001_PDF_PATH,
+    METRO_OPS_Z6001_PDF_PATH: process.env.METRO_OPS_Z6001_PDF_PATH,
+  };
+}
+
+function restoreDefaultPdfEnv(env: Record<string, string | undefined>): void {
+  for (const [key, value] of Object.entries(env)) {
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
 }

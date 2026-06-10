@@ -13,13 +13,12 @@
     "dev:backend": "pnpm --filter @metro-ops/backend dev",
     "dev:frontend": "pnpm --filter @metro-ops/frontend dev",
     "ci": "pnpm lint && pnpm typecheck && pnpm test",
-    "ci:restricted": "pnpm lint && pnpm typecheck && pnpm test:automation",
+    "ci:restricted": "pnpm run ci",
     "daily:local": "node scripts/local-daily-check.mjs",
-    "daily:automation": "node scripts/local-daily-check.mjs --restricted-automation",
+    "daily:automation": "pnpm run daily:local",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
-    "test": "pnpm -r test",
-    "test:automation": "pnpm -r --filter '!@metro-ops/shared' test"
+    "test": "pnpm -r test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

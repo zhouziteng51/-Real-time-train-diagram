@@ -3,6 +3,8 @@ import type { Direction, NormalizedImportDocument } from "@metro-ops/shared";
 import { DEMO_OPERATORS } from "../operator/operator.fixtures.js";
 import { FALLBACK_SCHEDULE_VERSION_ID, TripStore } from "../trip/trip.store.js";
 import { readFile } from "node:fs/promises";
+import { dirname, join, resolve, basename } from "node:path";
+import { fileURLToPath } from "node:url";
 import { PdfOcrHybridParser } from "../import/parsers/normalize.js";
 
 type TrainDoc = NormalizedImportDocument["trains"][number];
@@ -45,10 +47,19 @@ interface StoredTrain extends TrainDoc {
   scheduleVersionName?: string | undefined;
 }
 
-const DEFAULT_PDF_FILES = {
-  G6001: "/Users/zhouziteng/Desktop/实时时刻表/G6001时刻表.pdf",
-  Z6001: "/Users/zhouziteng/Desktop/实时时刻表/Z6001时刻表.pdf",
+type DefaultScheduleVersionId = "G6001" | "Z6001";
+
+const DEFAULT_PDF_FILE_NAMES: Record<DefaultScheduleVersionId, string> = {
+  G6001: "G6001时刻表.pdf",
+  Z6001: "Z6001时刻表.pdf",
 } as const;
+
+const DEFAULT_PDF_FILE_ENV: Record<DefaultScheduleVersionId, string> = {
+  G6001: "METRO_OPS_G6001_PDF_PATH",
+  Z6001: "METRO_OPS_Z6001_PDF_PATH",
+} as const;
+
+const DEFAULT_PDF_DIR_ENV = "METRO_OPS_DEFAULT_SCHEDULE_PDF_DIR";
 
 const FALLBACK_TRAINS: StoredTrain[] = [
   {
@@ -325,13 +336,13 @@ export class RuntimeScheduleService implements OnModuleInit {
   }
 
   private async loadDefaultPdfSchedules(): Promise<void> {
-    for (const [scheduleVersionId, filePath] of Object.entries(
-      DEFAULT_PDF_FILES,
-    ) as Array<["G6001" | "Z6001", string]>) {
+    for (const scheduleVersionId of Object.keys(
+      DEFAULT_PDF_FILE_NAMES,
+    ) as DefaultScheduleVersionId[]) {
       try {
-        const buffer = await readFile(filePath);
+        const { buffer, filePath } = await readDefaultPdf(scheduleVersionId);
         const doc = await this.pdfParser.extract(buffer, {
-          fileName: filePath.split("/").at(-1) ?? filePath,
+          fileName: basename(filePath),
         });
         const normalizedDoc: NormalizedImportDocument = {
           ...doc,
@@ -351,10 +362,65 @@ export class RuntimeScheduleService implements OnModuleInit {
         );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        console.warn(`[runtime] failed to load ${filePath}: ${message}`);
+        console.warn(`[runtime] failed to load ${scheduleVersionId}: ${message}`);
       }
     }
   }
+}
+
+async function readDefaultPdf(
+  scheduleVersionId: DefaultScheduleVersionId,
+): Promise<{ buffer: Buffer; filePath: string }> {
+  const candidates = defaultPdfCandidates(scheduleVersionId);
+  const failures: string[] = [];
+
+  for (const filePath of candidates) {
+    try {
+      return { buffer: await readFile(filePath), filePath };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      failures.push(`${filePath} (${message})`);
+    }
+  }
+
+  throw new Error(`no bundled PDF found; tried ${failures.join("; ")}`);
+}
+
+function defaultPdfCandidates(
+  scheduleVersionId: DefaultScheduleVersionId,
+): string[] {
+  const fileName = DEFAULT_PDF_FILE_NAMES[scheduleVersionId];
+  const fileEnv = process.env[DEFAULT_PDF_FILE_ENV[scheduleVersionId]]?.trim();
+  const dirEnv = process.env[DEFAULT_PDF_DIR_ENV]?.trim();
+  const candidates = [
+    ...(fileEnv ? [resolve(fileEnv)] : []),
+    ...(dirEnv ? [join(resolve(dirEnv), fileName)] : []),
+    ...defaultPdfSearchRoots().map((root) => join(root, fileName)),
+  ];
+
+  return Array.from(new Set(candidates));
+}
+
+function defaultPdfSearchRoots(): string[] {
+  const moduleDir = dirname(fileURLToPath(import.meta.url));
+  return [
+    ...ancestorDirs(process.cwd(), 8),
+    ...ancestorDirs(moduleDir, 8),
+  ];
+}
+
+function ancestorDirs(start: string, maxDepth: number): string[] {
+  const roots: string[] = [];
+  let current = resolve(start);
+
+  for (let depth = 0; depth <= maxDepth; depth += 1) {
+    roots.push(current);
+    const next = dirname(current);
+    if (next === current) break;
+    current = next;
+  }
+
+  return roots;
 }
 
 function calculateTrainPosition(

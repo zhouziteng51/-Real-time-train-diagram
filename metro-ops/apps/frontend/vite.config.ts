@@ -9,6 +9,7 @@ export default defineConfig(({ mode }) => {
     env.METRO_OPS_DEV_WS_PROXY_TARGET || "ws://localhost:3001";
 
   return {
+    base: "./",
     plugins: [react()],
     server: {
       port: 5173,
