@@ -4,7 +4,7 @@ const { test } = require("node:test");
 global.getApp = () => ({
   globalData: {
     apiBaseUrl: "http://127.0.0.1:3000",
-    wsBaseUrl: "ws://127.0.0.1:3001",
+    wsBaseUrl: "ws://127.0.0.1:3000",
   },
 });
 

@@ -23,7 +23,7 @@
     </view>
     <view class="field">
       <view class="field-label">WebSocket 地址</view>
-      <input class="input" value="{{wsBaseUrl}}" data-field="wsBaseUrl" bindinput="onInput" placeholder="ws://192.168.1.100:3001" />
+      <input class="input" value="{{wsBaseUrl}}" data-field="wsBaseUrl" bindinput="onInput" placeholder="ws://192.168.1.100:3000" />
     </view>
     <view class="button-row action-row">
       <button class="btn btn-primary" bindtap="save">保存</button>

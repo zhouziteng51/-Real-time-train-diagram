@@ -1,27 +1,28 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import type { Server } from "node:http";
+import { Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
 import { WebSocketServer, WebSocket } from "ws";
 import {
   WsClientMessageSchema,
   type WsServerMessage,
   globalNetworkRoom,
 } from "@metro-ops/shared";
-import { resolveWsPort } from "./realtime.config.js";
 
 const WS_PATH = "/ws/network";
-const WS_PORT = resolveWsPort();
 
 @Injectable()
-export class RealtimeGateway implements OnModuleInit, OnModuleDestroy {
+export class RealtimeGateway implements OnModuleDestroy {
   private readonly logger = new Logger(RealtimeGateway.name);
   private wss?: WebSocketServer;
   private readonly rooms = new Map<string, Set<WebSocket>>();
   private readonly clientRooms = new WeakMap<WebSocket, Set<string>>();
   private onlineClients = 0;
 
-  onModuleInit(): void {
-    this.wss = new WebSocketServer({ port: WS_PORT, path: WS_PATH });
+  attachHttpServer(server: Server): void {
+    if (this.wss) return;
+
+    this.wss = new WebSocketServer({ server, path: WS_PATH });
     this.wss.on("connection", (socket) => this.handleConnection(socket));
-    this.logger.log(`WebSocket listening on ws://127.0.0.1:${WS_PORT}${WS_PATH}`);
+    this.logger.log(`WebSocket attached at ${WS_PATH}`);
   }
 
   onModuleDestroy(): void {

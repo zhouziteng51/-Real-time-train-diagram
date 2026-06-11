@@ -2,7 +2,7 @@ const API_STORAGE_KEY = "metroOpsApiBaseUrl";
 const WS_STORAGE_KEY = "metroOpsWsBaseUrl";
 const CHANGE_EVENT_NAME = "metroOpsBackendConfigChanged";
 const DEFAULT_API_BASE_URL = "http://127.0.0.1:3000";
-const DEFAULT_WS_BASE_URL = "ws://127.0.0.1:3001";
+const DEFAULT_WS_BASE_URL = "ws://127.0.0.1:3000";
 
 function readBackendConfig() {
   const apiBaseUrl = wx.getStorageSync(API_STORAGE_KEY) || DEFAULT_API_BASE_URL;
@@ -85,7 +85,7 @@ function backendPresets() {
       title: "局域网",
       note: "手机访问电脑后端",
       apiBaseUrl: "http://192.168.1.100:3000",
-      wsBaseUrl: "ws://192.168.1.100:3001",
+      wsBaseUrl: "ws://192.168.1.100:3000",
     },
     {
       id: "remote",

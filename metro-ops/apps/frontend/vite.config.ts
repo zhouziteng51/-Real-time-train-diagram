@@ -6,7 +6,7 @@ export default defineConfig(({ mode }) => {
   const apiProxyTarget =
     env.METRO_OPS_DEV_API_PROXY_TARGET || "http://localhost:3000";
   const wsProxyTarget =
-    env.METRO_OPS_DEV_WS_PROXY_TARGET || "ws://localhost:3001";
+    env.METRO_OPS_DEV_WS_PROXY_TARGET || "ws://localhost:3000";
 
   return {
     base: "./",

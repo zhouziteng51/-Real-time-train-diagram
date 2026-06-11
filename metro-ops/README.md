@@ -44,7 +44,7 @@ pnpm run daily:automation   # 自动化日报同款检查,与 daily:local 覆盖
 本地前端默认通过 Vite 代理访问 `http://localhost:3000` 的 `/api` 和 `/ws`。如果后端 WebSocket 单独开端口,可临时设置:
 
 ```bash
-METRO_OPS_DEV_WS_PROXY_TARGET=ws://localhost:3001 pnpm dev:frontend
+METRO_OPS_DEV_WS_PROXY_TARGET=ws://localhost:3000 pnpm dev:frontend
 ```
 
 ## 线上分享版
